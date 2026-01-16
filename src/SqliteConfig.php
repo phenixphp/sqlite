@@ -1,9 +1,11 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Phenix\Sqlite;
 
-use Error;
 use Amp\Sql\SqlConfig;
+use Error;
 
 class SqliteConfig extends SqlConfig
 {
@@ -29,7 +31,7 @@ class SqliteConfig extends SqlConfig
     {
         $parts = self::parseConnectionString($connectionString, self::KEY_MAP);
 
-        if (!isset($parts['db'])) {
+        if (! isset($parts['db'])) {
             throw new Error('Database path must be provided in connection string');
         }
 

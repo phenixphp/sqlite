@@ -1,12 +1,18 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Phenix\Sqlite\Constants;
 
-use Amp\Sql\SqlException;
+use function is_float;
+use function is_int;
+use function str_contains;
+use function strtoupper;
+use function trim;
 
 /**
  * SQLite data types based on storage classes (type affinity).
- * 
+ *
  * @see https://www.sqlite.org/datatype3.html
  */
 enum SqliteDataType: int
@@ -20,42 +26,42 @@ enum SqliteDataType: int
 
     /**
      * Map declared type names to SQLite storage classes.
-     * 
+     *
      * @see https://www.sqlite.org/datatype3.html#type_affinity
      */
     public static function fromDeclaredType(string $declaredType): self
     {
-        $declaredType = \strtoupper(\trim($declaredType));
-        
+        $declaredType = strtoupper(trim($declaredType));
+
         // NULL type affinity
         if ($declaredType === '') {
             return self::Blob;
         }
-        
+
         // INTEGER type affinity
-        if (\str_contains($declaredType, 'INT')) {
+        if (str_contains($declaredType, 'INT')) {
             return self::Integer;
         }
-        
+
         // TEXT type affinity
-        if (\str_contains($declaredType, 'CHAR') ||
-            \str_contains($declaredType, 'CLOB') ||
-            \str_contains($declaredType, 'TEXT')) {
+        if (str_contains($declaredType, 'CHAR') ||
+            str_contains($declaredType, 'CLOB') ||
+            str_contains($declaredType, 'TEXT')) {
             return self::Text;
         }
-        
+
         // BLOB type affinity
         if ($declaredType === 'BLOB' || $declaredType === '') {
             return self::Blob;
         }
-        
+
         // REAL type affinity
-        if (\str_contains($declaredType, 'REAL') ||
-            \str_contains($declaredType, 'FLOA') ||
-            \str_contains($declaredType, 'DOUB')) {
+        if (str_contains($declaredType, 'REAL') ||
+            str_contains($declaredType, 'FLOA') ||
+            str_contains($declaredType, 'DOUB')) {
             return self::Real;
         }
-        
+
         // NUMERIC type affinity (maps to REAL for simplification)
         return self::Real;
     }
@@ -79,8 +85,8 @@ enum SqliteDataType: int
 
         return match ($this) {
             self::Null => null,
-            self::Integer => \is_int($value) ? $value : (int) $value,
-            self::Real => \is_float($value) ? $value : (float) $value,
+            self::Integer => is_int($value) ? $value : (int) $value,
+            self::Real => is_float($value) ? $value : (float) $value,
             self::Text => (string) $value,
             self::Blob => (string) $value,
         };
