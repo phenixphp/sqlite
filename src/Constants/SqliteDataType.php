@@ -51,7 +51,7 @@ enum SqliteDataType: int
         }
 
         // BLOB type affinity
-        if ($declaredType === 'BLOB' || $declaredType === '') {
+        if ($declaredType === 'BLOB') {
             return self::Blob;
         }
 
