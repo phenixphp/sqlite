@@ -13,3 +13,5 @@ Thumbs.db
 build
 .env
 knowledge
+.php-cs-fixer.cache
+.php_cs.cache
