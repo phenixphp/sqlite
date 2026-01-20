@@ -18,7 +18,7 @@ class SqliteConnector implements SqlConnector
     use ForbidCloning;
     use ForbidSerialization;
 
-    public function connect(SqlConfig $config, ?Cancellation $cancellation = null): SqliteConnection
+    public function connect(SqlConfig $config, null|Cancellation $cancellation = null): SqliteConnection
     {
         if (! $config instanceof SqliteConfig) {
             throw new TypeError(sprintf('Must provide an instance of %s to SQLite connectors', SqliteConfig::class));
