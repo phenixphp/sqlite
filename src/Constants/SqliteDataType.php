@@ -11,22 +11,22 @@ use function strtoupper;
 use function trim;
 
 /**
- * SQLite data types based on storage classes (type affinity).
- *
  * @see https://www.sqlite.org/datatype3.html
  */
 enum SqliteDataType: int
 {
     // SQLite storage classes
     case Null = 0x00;
+
     case Integer = 0x01;
+
     case Real = 0x02;
+
     case Text = 0x03;
+
     case Blob = 0x04;
 
     /**
-     * Map declared type names to SQLite storage classes.
-     *
      * @see https://www.sqlite.org/datatype3.html#type_affinity
      */
     public static function fromDeclaredType(string $declaredType): self
