@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Phenix\Sqlite\Internal\Tasks;
 
-class Result
+final class Result
 {
     protected bool $status;
 

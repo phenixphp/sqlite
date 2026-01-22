@@ -29,7 +29,7 @@ class ConnectDatabase implements Task
         }
     }
 
-    public function connect(): PDO
+    protected function connect(): PDO
     {
         $dsn = sprintf(
             'sqlite:%s',

@@ -91,7 +91,6 @@ class SqliteConnection implements SqliteConnectionContract
             $this->busy->getFuture()->await();
         }
 
-        // TODO: Implement actual SQLite query execution
         return $this->processor->query($sql)->await();
     }
 

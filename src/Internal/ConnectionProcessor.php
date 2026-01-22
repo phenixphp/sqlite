@@ -14,9 +14,12 @@ use Amp\Sql\SqlTransientResource;
 use Closure;
 use Error;
 use Phenix\Sqlite\Constants\ConnectionState;
+use Phenix\Sqlite\Constants\SqliteDataType;
 use Phenix\Sqlite\Internal\Exceptions\ConnectionFailureException;
 use Phenix\Sqlite\Internal\Tasks\ConnectDatabase;
+use Phenix\Sqlite\Internal\Tasks\ExecuteQuery;
 use Phenix\Sqlite\Internal\Tasks\Result;
+use Phenix\Sqlite\SqliteColumnDefinition;
 use Phenix\Sqlite\SqliteConfig;
 use SplQueue;
 
@@ -117,26 +120,36 @@ class ConnectionProcessor implements SqlTransientResource
     public function query(string $query): Future
     {
         if ($this->isClosed()) {
-            throw new Error("The connection has been closed");
+            throw new Error('The connection has been closed');
         }
 
-        // TODO: Implement query execution
-        // 1. Create query task: new ExecuteQueryTask($query)
-        // 2. Submit to worker: $execution = $this->worker->submit($task)
-        // 3. Parse result rows and column definitions from execution result
-        // Strategy:
-        // 1. Create ExecuteQuery task with SQL and config
-        // 2. Task opens PDO connection in worker process
-        // 3. Task executes query and fetches all rows
-        // 4. Task returns serializable data:
-        //    - rows: array<array<string, mixed>>
-        //    - columnDefinitions: array with names, types, etc
-        //    - lastInsertId: int|null
-        //    - affectedRows: int
-        // 5. Build SqliteConnectionResult from returned data
-        // 6. Worker process closes PDO automatically after task completion
+        $execution = $this->worker->submit(new ExecuteQuery($this->config, $query));
+
+        /** @var Result $taskResult */
+        $taskResult = $execution->await();
+
+        if ($taskResult->failed()) {
+            $deferred = new DeferredFuture();
+            $deferred->error(new Error($taskResult->message() ?? "Query execution failed"));
+
+            return $deferred->getFuture();
+        }
+
+        $data = $taskResult->output();
+
+        $columnDefinitions = $this->buildColumnDefinitions($data['columnDefinitions']);
+
+        $result = new SqliteConnectionResult(
+            columnDefinitions: $columnDefinitions,
+            rows: $data['rows'],
+            lastInsertId: $data['lastInsertId'],
+            affectedRows: $data['affectedRows'],
+        );
+
+        $this->lastUsedAt = time();
+
         $deferred = new DeferredFuture();
-        $deferred->error(new Error("Query not yet implemented"));
+        $deferred->complete($result);
 
         return $deferred->getFuture();
     }
@@ -192,5 +205,44 @@ class ConnectionProcessor implements SqlTransientResource
         foreach ($this->closeCallbacks as $callback) {
             $callback();
         }
+    }
+
+    /**
+     * @param array<array{name: string, type: string, declaredType: string|null, table: string|null, length: int, flags: int, decimals: int}>|null $columnData
+     * @return array<SqliteColumnDefinition>|null
+     */
+    private function buildColumnDefinitions(array|null $columnData): array|null
+    {
+        if ($columnData === null) {
+            return null;
+        }
+
+        $definitions = [];
+        foreach ($columnData as $column) {
+            $typeEnum = match ($column['type']) {
+                'Null' => SqliteDataType::Null,
+                'Integer' => SqliteDataType::Integer,
+                'Real' => SqliteDataType::Real,
+                'Text' => SqliteDataType::Text,
+                'Blob' => SqliteDataType::Blob,
+                default => SqliteDataType::Text,
+            };
+
+            $definitions[] = new SqliteColumnDefinition(
+                table: $column['table'] ?? '',
+                name: $column['name'],
+                length: $column['length'],
+                type: $typeEnum,
+                flags: $column['flags'],
+                decimals: $column['decimals'],
+                defaults: '',
+                originalTable: $column['table'],
+                originalName: $column['name'],
+                declaredType: $column['declaredType'],
+                schema: null,
+            );
+        }
+
+        return $definitions;
     }
 }
