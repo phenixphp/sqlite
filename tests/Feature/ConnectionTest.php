@@ -34,20 +34,13 @@ class ConnectionTest extends TestCase
      */
     public function it_can_connect_to_a_file_based_database(): void
     {
-        $dbPath = sys_get_temp_dir() . '/test_' . uniqid() . '.db';
-        $config = SqliteConfig::fromPath($dbPath);
-
-        $connection = SqliteConnection::connect($config);
+        $connection = $this->getConnection();
 
         $this->assertInstanceOf(SqliteConnection::class, $connection);
         $this->assertFalse($connection->isClosed());
-        $this->assertSame($dbPath, $connection->getConfig()->getPath());
+        $this->assertSame($this->databasePath, $connection->getConfig()->getPath());
 
         $connection->close();
-
-        if (file_exists($dbPath)) {
-            unlink($dbPath);
-        }
     }
 
     /**
