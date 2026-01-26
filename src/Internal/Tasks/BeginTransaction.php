@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Phenix\Sqlite\Internal\Tasks;
 
+use Throwable;
 use Amp\Cancellation;
 use Amp\Sync\Channel;
 use Phenix\Sqlite\SqliteConfig;
-use Throwable;
+use Phenix\Sqlite\Internal\ConnectionContext;
 
 class BeginTransaction extends ConnectDatabase
 {
@@ -21,17 +22,10 @@ class BeginTransaction extends ConnectDatabase
     public function run(Channel $channel, Cancellation $cancellation): Result
     {
         try {
-            $getConnection = $GLOBALS['getConnection'] ?? null;
-
-            if ($getConnection === null) {
-                return Result::failure(null, 'Worker bootstrap not loaded - persistent connections unavailable');
-            }
-
-            // Set the database path for this and subsequent tasks
             $dbPath = $this->config->getPath();
-            $GLOBALS['current_db_path'] = $dbPath;
 
-            $pdo = $getConnection($dbPath);
+            // Get persistent PDO connection from ConnectionContext
+            $pdo = ConnectionContext::getConnection($dbPath);
 
             // Check if already in transaction
             if ($pdo->inTransaction()) {
@@ -41,19 +35,14 @@ class BeginTransaction extends ConnectDatabase
                 ));
             }
 
-            // Begin transaction with the specified type
-            // Note: PDO->beginTransaction() doesn't support transaction type parameters in SQLite
-            // We must use PDO's beginTransaction() for proper inTransaction() tracking
-            // All SQLite transaction types (DEFERRED, IMMEDIATE, EXCLUSIVE) start the same way
-            // The differences are in locking behavior which SQLite handles internally
-
+            // Begin transaction
+            // Note: PDO->beginTransaction() doesn't support transaction type parameters
+            // All SQLite transaction types (DEFERRED, IMMEDIATE, EXCLUSIVE) start with BEGIN
+            // The transactionType parameter is informational for now
             $pdo->beginTransaction();
 
-            // Mark transaction state
-            $setTransactionState = $GLOBALS['setTransactionState'] ?? null;
-            if ($setTransactionState !== null) {
-                $setTransactionState($dbPath, true);
-            }
+            // Mark transaction state in ConnectionContext
+            ConnectionContext::markTransactionActive($dbPath);
 
             return Result::success(['started' => true]);
         } catch (Throwable $e) {

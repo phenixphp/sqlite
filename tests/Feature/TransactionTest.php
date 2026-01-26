@@ -18,8 +18,9 @@ class TransactionTest extends TestCase
 
         $this->connection = $this->getConnection();
 
+        $this->connection->query("DROP TABLE IF EXISTS users");
         $this->connection->query("
-            CREATE TABLE IF NOT EXISTS users (
+            CREATE TABLE users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
                 email TEXT NOT NULL

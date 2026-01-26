@@ -9,7 +9,10 @@ use Amp\Parallel\Worker\Task;
 use Amp\Sync\Channel;
 use PDO;
 use Phenix\Sqlite\SqliteConfig;
+use Phenix\Sqlite\Internal\ConnectionContext;
 use Throwable;
+
+use function sprintf;
 
 class ConnectDatabase implements Task
 {
@@ -31,24 +34,17 @@ class ConnectDatabase implements Task
 
     protected function connect(): PDO
     {
-        // Try to use persistent connection from bootstrap
-        $getConnection = $GLOBALS['getConnection'] ?? null;
+        $dbPath = $this->config->getPath();
 
-        if ($getConnection !== null) {
-            $pdo = $getConnection($this->config->getPath());
+        // // Get persistent connection from ConnectionContext
+        // $pdo = ConnectionContext::getConnection($dbPath);
 
-            // Only apply PRAGMAs if this is a new connection
-            // Check if PRAGMAs were already applied by checking a marker
-            $markerKey = 'sqlite_pragmas_applied_' . md5($this->config->getPath());
-            if (! isset($GLOBALS[$markerKey])) {
-                $this->applyPragmas($pdo);
-                $GLOBALS[$markerKey] = true;
-            }
+        // // Apply PRAGMAs only once per connection
+        // if (!ConnectionContext::arePragmasApplied($dbPath)) {
+        //     $this->applyPragmas($pdo);
+        //     ConnectionContext::markPragmasApplied($dbPath);
+        // }
 
-            return $pdo;
-        }
-
-        // Fallback for environments without bootstrap (e.g., tests)
         $dsn = sprintf(
             'sqlite:%s',
             $this->config->getPath()

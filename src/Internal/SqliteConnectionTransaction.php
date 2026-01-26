@@ -35,8 +35,7 @@ class SqliteConnectionTransaction implements SqliteTransaction
             throw new Error("Transaction is not active");
         }
 
-        // TODO: Implement query execution within transaction context
-        return $this->processor->query($sql)->await();
+        return $this->processor->queryInTransaction($sql)->await();
     }
 
     public function prepare(string $sql): SqliteStatement

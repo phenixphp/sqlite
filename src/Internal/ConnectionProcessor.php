@@ -23,6 +23,7 @@ use Phenix\Sqlite\SqliteColumnDefinition;
 use Phenix\Sqlite\SqliteConfig;
 use SplQueue;
 
+use function Amp\Parallel\Worker\getWorker;
 use function time;
 
 class ConnectionProcessor implements SqlTransientResource
@@ -46,9 +47,11 @@ class ConnectionProcessor implements SqlTransientResource
 
     private Worker $worker;
 
+    private Worker|null $dedicatedWorker = null;
+
     private array $closeCallbacks = [];
 
-    public function __construct(SqliteConfig $config)
+    public function __construct(SqliteConfig $config, Worker|null $worker = null)
     {
         $this->metadata = new SqliteConnectionMetadata();
         $this->config = $config;
@@ -57,7 +60,8 @@ class ConnectionProcessor implements SqlTransientResource
         $this->deferreds = new SplQueue();
         $this->onReady = new SplQueue();
 
-        $this->worker = SqliteWorkerFactory::create();
+        $this->worker = $worker ?? SqliteWorkerFactory::acquire();
+        // $this->worker = $worker ?? getWorker();
     }
 
     public function isClosed(): bool
@@ -155,6 +159,52 @@ class ConnectionProcessor implements SqlTransientResource
     }
 
     /**
+     * Execute a query within a transaction using the dedicated worker.
+     *
+     * @return Future<SqliteConnectionResult>
+     */
+    public function queryInTransaction(string $query): Future
+    {
+        if ($this->isClosed()) {
+            throw new Error('The connection has been closed');
+        }
+
+        if ($this->dedicatedWorker === null) {
+            throw new Error('No active transaction');
+        }
+
+        $execution = $this->dedicatedWorker->submit(new Tasks\ExecuteTransactionQuery($this->config, $query));
+
+        /** @var Result $taskResult */
+        $taskResult = $execution->await();
+
+        if ($taskResult->failed()) {
+            $deferred = new DeferredFuture();
+            $deferred->error(new Error($taskResult->message() ?? "Query execution failed"));
+
+            return $deferred->getFuture();
+        }
+
+        $data = $taskResult->output();
+
+        $columnDefinitions = $this->buildColumnDefinitions($data['columnDefinitions']);
+
+        $result = new SqliteConnectionResult(
+            columnDefinitions: $columnDefinitions,
+            rows: $data['rows'],
+            lastInsertId: $data['lastInsertId'],
+            affectedRows: $data['affectedRows'],
+        );
+
+        $this->lastUsedAt = time();
+
+        $deferred = new DeferredFuture();
+        $deferred->complete($result);
+
+        return $deferred->getFuture();
+    }
+
+    /**
      * @return Future<bool>
      */
     public function beginTransaction(string $transactionType): Future
@@ -163,12 +213,20 @@ class ConnectionProcessor implements SqlTransientResource
             throw new Error('The connection has been closed');
         }
 
-        $execution = $this->worker->submit(new Tasks\BeginTransaction($this->config, $transactionType));
+        // Acquire dedicated worker for this transaction if not already acquired
+        if ($this->dedicatedWorker === null) {
+            $this->dedicatedWorker = SqliteWorkerFactory::acquireDedicated();
+        }
+
+        $execution = $this->dedicatedWorker->submit(new Tasks\BeginTransaction($this->config, $transactionType));
 
         /** @var Result $taskResult */
         $taskResult = $execution->await();
 
         if ($taskResult->failed()) {
+            // Release dedicated worker on failure
+            $this->releaseDedicatedWorker();
+
             $deferred = new DeferredFuture();
             $deferred->error(new Error($taskResult->message() ?? "Failed to begin transaction"));
 
@@ -192,10 +250,19 @@ class ConnectionProcessor implements SqlTransientResource
             throw new Error('The connection has been closed');
         }
 
-        $execution = $this->worker->submit(new Tasks\CommitTransaction($this->config));
+        if ($this->dedicatedWorker === null) {
+            $deferred = new DeferredFuture();
+            $deferred->error(new Error("No active transaction to commit"));
+            return $deferred->getFuture();
+        }
+
+        $execution = $this->dedicatedWorker->submit(new Tasks\CommitTransaction($this->config));
 
         /** @var Result $taskResult */
         $taskResult = $execution->await();
+
+        // Always release dedicated worker after commit attempt
+        $this->releaseDedicatedWorker();
 
         if ($taskResult->failed()) {
             $deferred = new DeferredFuture();
@@ -221,10 +288,19 @@ class ConnectionProcessor implements SqlTransientResource
             throw new Error('The connection has been closed');
         }
 
-        $execution = $this->worker->submit(new Tasks\RollbackTransaction($this->config));
+        if ($this->dedicatedWorker === null) {
+            $deferred = new DeferredFuture();
+            $deferred->error(new Error("No active transaction to rollback"));
+            return $deferred->getFuture();
+        }
+
+        $execution = $this->dedicatedWorker->submit(new Tasks\RollbackTransaction($this->config));
 
         /** @var Result $taskResult */
         $taskResult = $execution->await();
+
+        // Always release dedicated worker after rollback attempt
+        $this->releaseDedicatedWorker();
 
         if ($taskResult->failed()) {
             $deferred = new DeferredFuture();
@@ -279,18 +355,27 @@ class ConnectionProcessor implements SqlTransientResource
 
         $this->connectionState = ConnectionState::Closing;
 
-        // TODO: Implement connection cleanup
-        // Strategy:
-        // 1. Mark all pending deferreds as failed
-        // 2. No need to close PDO - each task manages its own connection
-        // 3. Worker pool automatically manages worker lifecycle
-        // 4. For transactions: send rollback task if active
-        // Note: Workers are reused by the pool, don't shutdown manually
+        // Release dedicated worker if active transaction
+        $this->releaseDedicatedWorker();
+
+        // Release regular worker back to pool
+        SqliteWorkerFactory::release($this->worker);
 
         $this->connectionState = ConnectionState::Closed;
 
         foreach ($this->closeCallbacks as $callback) {
             $callback();
+        }
+    }
+
+    /**
+     * Release the dedicated worker back to the pool.
+     */
+    private function releaseDedicatedWorker(): void
+    {
+        if ($this->dedicatedWorker !== null) {
+            SqliteWorkerFactory::releaseDedicated($this->dedicatedWorker);
+            $this->dedicatedWorker = null;
         }
     }
 

@@ -13,7 +13,12 @@ use Phenix\Sqlite\SqliteConfig;
 use Phenix\Sqlite\Internal\ConnectionContext;
 use Throwable;
 
-class ExecuteQuery extends ConnectDatabase
+/**
+ * Execute a query within a transaction context.
+ * Uses ConnectionContext to access the persistent PDO connection
+ * without re-applying PRAGMAs or reconnecting.
+ */
+class ExecuteTransactionQuery extends ConnectDatabase
 {
     public function __construct(
         SqliteConfig $config,
@@ -25,8 +30,14 @@ class ExecuteQuery extends ConnectDatabase
     public function run(Channel $channel, Cancellation $cancellation): Result
     {
         try {
-            // Ensure connection is established with PRAGMAs
-            $pdo = $this->connect();
+            // Get persistent PDO connection directly from ConnectionContext
+            // This ensures we use the same connection where the transaction was started
+            $pdo = ConnectionContext::getConnection($this->config->getPath());
+
+            // Verify we're in a transaction
+            if (!$pdo->inTransaction()) {
+                return Result::failure(null, 'Not in a transaction - cannot execute transaction query');
+            }
 
             $stmt = $pdo->query($this->sql);
 

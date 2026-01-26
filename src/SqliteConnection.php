@@ -15,6 +15,7 @@ use Phenix\Sqlite\Contracts\SqliteConnection as SqliteConnectionContract;
 use Phenix\Sqlite\Contracts\SqliteResult;
 use Phenix\Sqlite\Contracts\SqliteStatement;
 use Phenix\Sqlite\Contracts\SqliteTransaction;
+use Phenix\Sqlite\Internal\SqliteWorkerFactory;
 use Revolt\EventLoop;
 use RuntimeException;
 use Throwable;
@@ -37,11 +38,13 @@ class SqliteConnection implements SqliteConnectionContract
         $processor = new Internal\ConnectionProcessor($config);
         $processor->connect($cancellation);
 
-        return new self($processor);
+        return new self($processor, $config);
     }
 
-    private function __construct(private readonly Internal\ConnectionProcessor $processor)
-    {
+    private function __construct(
+        private readonly Internal\ConnectionProcessor $processor,
+        protected readonly SqliteConfig $config
+    ) {
         $busy = &$this->busy;
         $this->release = static function () use (&$busy): void {
             $busy?->complete();
@@ -51,7 +54,7 @@ class SqliteConnection implements SqliteConnectionContract
 
     public function getConfig(): SqliteConfig
     {
-        return $this->processor->getConfig();
+        return $this->config;
     }
 
     public function getTransactionIsolation(): SqlTransactionIsolation
@@ -103,6 +106,8 @@ class SqliteConnection implements SqliteConnectionContract
 
         $this->busy = $deferred = new DeferredFuture();
 
+        $processor = new Internal\ConnectionProcessor($this->config, SqliteWorkerFactory::create());
+
         // SQLite supports: DEFERRED, IMMEDIATE, EXCLUSIVE transactions
         // Map SQL standard isolation levels to SQLite transaction types:
         // - Uncommitted/Committed -> DEFERRED (default, locks on first read/write)
@@ -117,7 +122,7 @@ class SqliteConnection implements SqliteConnectionContract
         };
 
         try {
-            $result = $this->processor->beginTransaction($transactionType)->await();
+            $result = $processor->beginTransaction($transactionType)->await();
 
             if (! $result) {
                 throw new RuntimeException('Failed to begin transaction');
@@ -130,7 +135,7 @@ class SqliteConnection implements SqliteConnectionContract
         }
 
         return new Internal\SqliteConnectionTransaction(
-            $this->processor,
+            $processor,
             $this->transactionIsolation,
             $this->release,
         );
