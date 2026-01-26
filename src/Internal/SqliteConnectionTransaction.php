@@ -76,19 +76,20 @@ class SqliteConnectionTransaction implements SqliteTransaction
             throw new Error("Transaction is not active");
         }
 
-        // TODO: Implement transaction commit
-        // 1. Execute "COMMIT" or "RELEASE SAVEPOINT sp_name" for nested
-        // 2. Mark transaction as inactive
-        // 3. Call release callback
-        // 4. Invoke all onCommit callbacks
+        // Handle nested transaction (savepoint)
+        if ($this->savepointId !== null) {
+            $this->processor->query("RELEASE SAVEPOINT {$this->savepointId}")->await();
+        } else {
+            // Commit main transaction
+            $this->processor->commitTransaction()->await();
+        }
+
         $this->active = false;
         ($this->release)();
 
         foreach ($this->onCommitCallbacks as $callback) {
             $callback();
         }
-
-        throw new Error("Transaction commit not yet implemented");
     }
 
     public function rollback(): void
@@ -97,19 +98,21 @@ class SqliteConnectionTransaction implements SqliteTransaction
             throw new Error("Transaction is not active");
         }
 
-        // TODO: Implement transaction rollback
-        // 1. Execute "ROLLBACK" or "ROLLBACK TO SAVEPOINT sp_name" for nested
-        // 2. Mark transaction as inactive
-        // 3. Call release callback
-        // 4. Invoke all onRollback callbacks
+        // Handle nested transaction (savepoint)
+        if ($this->savepointId !== null) {
+            $this->processor->query("ROLLBACK TO SAVEPOINT {$this->savepointId}")->await();
+            $this->processor->query("RELEASE SAVEPOINT {$this->savepointId}")->await();
+        } else {
+            // Rollback main transaction
+            $this->processor->rollbackTransaction()->await();
+        }
+
         $this->active = false;
         ($this->release)();
 
         foreach ($this->onRollbackCallbacks as $callback) {
             $callback();
         }
-
-        throw new Error("Transaction rollback not yet implemented");
     }
 
     public function isActive(): bool

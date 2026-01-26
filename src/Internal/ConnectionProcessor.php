@@ -23,7 +23,6 @@ use Phenix\Sqlite\SqliteColumnDefinition;
 use Phenix\Sqlite\SqliteConfig;
 use SplQueue;
 
-use function Amp\Parallel\Worker\getWorker;
 use function time;
 
 class ConnectionProcessor implements SqlTransientResource
@@ -57,7 +56,8 @@ class ConnectionProcessor implements SqlTransientResource
 
         $this->deferreds = new SplQueue();
         $this->onReady = new SplQueue();
-        $this->worker = getWorker();
+
+        $this->worker = SqliteWorkerFactory::create();
     }
 
     public function isClosed(): bool
@@ -150,6 +150,93 @@ class ConnectionProcessor implements SqlTransientResource
 
         $deferred = new DeferredFuture();
         $deferred->complete($result);
+
+        return $deferred->getFuture();
+    }
+
+    /**
+     * @return Future<bool>
+     */
+    public function beginTransaction(string $transactionType): Future
+    {
+        if ($this->isClosed()) {
+            throw new Error('The connection has been closed');
+        }
+
+        $execution = $this->worker->submit(new Tasks\BeginTransaction($this->config, $transactionType));
+
+        /** @var Result $taskResult */
+        $taskResult = $execution->await();
+
+        if ($taskResult->failed()) {
+            $deferred = new DeferredFuture();
+            $deferred->error(new Error($taskResult->message() ?? "Failed to begin transaction"));
+
+            return $deferred->getFuture();
+        }
+
+        $this->lastUsedAt = time();
+
+        $deferred = new DeferredFuture();
+        $deferred->complete(true);
+
+        return $deferred->getFuture();
+    }
+
+    /**
+     * @return Future<bool>
+     */
+    public function commitTransaction(): Future
+    {
+        if ($this->isClosed()) {
+            throw new Error('The connection has been closed');
+        }
+
+        $execution = $this->worker->submit(new Tasks\CommitTransaction($this->config));
+
+        /** @var Result $taskResult */
+        $taskResult = $execution->await();
+
+        if ($taskResult->failed()) {
+            $deferred = new DeferredFuture();
+            $deferred->error(new Error($taskResult->message() ?? "Failed to commit transaction"));
+
+            return $deferred->getFuture();
+        }
+
+        $this->lastUsedAt = time();
+
+        $deferred = new DeferredFuture();
+        $deferred->complete(true);
+
+        return $deferred->getFuture();
+    }
+
+    /**
+     * @return Future<bool>
+     */
+    public function rollbackTransaction(): Future
+    {
+        if ($this->isClosed()) {
+            throw new Error('The connection has been closed');
+        }
+
+        $execution = $this->worker->submit(new Tasks\RollbackTransaction($this->config));
+
+        /** @var Result $taskResult */
+        $taskResult = $execution->await();
+
+        if ($taskResult->failed()) {
+            $deferred = new DeferredFuture();
+            $deferred->error(new Error($taskResult->message() ?? "Failed to rollback transaction"));
+
+            return $deferred->getFuture();
+        }
+
+        $this->lastUsedAt = time();
+
+        $deferred = new DeferredFuture();
+        $deferred->complete(true);
 
         return $deferred->getFuture();
     }

@@ -16,6 +16,7 @@ use Phenix\Sqlite\Contracts\SqliteResult;
 use Phenix\Sqlite\Contracts\SqliteStatement;
 use Phenix\Sqlite\Contracts\SqliteTransaction;
 use Revolt\EventLoop;
+use RuntimeException;
 use Throwable;
 
 class SqliteConnection implements SqliteConnectionContract
@@ -107,7 +108,7 @@ class SqliteConnection implements SqliteConnectionContract
         // - Uncommitted/Committed -> DEFERRED (default, locks on first read/write)
         // - Repeatable -> IMMEDIATE (locks database on BEGIN)
         // - Serializable -> EXCLUSIVE (prevents all concurrent access)
-        $sql = match (true) {
+        $transactionType = match (true) {
             $this->transactionIsolation === SqlTransactionIsolationLevel::Uncommitted => "BEGIN DEFERRED TRANSACTION",
             $this->transactionIsolation === SqlTransactionIsolationLevel::Committed => "BEGIN DEFERRED TRANSACTION",
             $this->transactionIsolation === SqlTransactionIsolationLevel::Repeatable => "BEGIN IMMEDIATE TRANSACTION",
@@ -116,7 +117,11 @@ class SqliteConnection implements SqliteConnectionContract
         };
 
         try {
-            $this->processor->query($sql)->await();
+            $result = $this->processor->beginTransaction($transactionType)->await();
+
+            if (! $result) {
+                throw new RuntimeException('Failed to begin transaction');
+            }
         } catch (Throwable $exception) {
             $this->busy = null;
             $deferred->complete();
@@ -124,7 +129,6 @@ class SqliteConnection implements SqliteConnectionContract
             throw $exception;
         }
 
-        // TODO: SqliteConnectionTransaction needs actual transaction implementation
         return new Internal\SqliteConnectionTransaction(
             $this->processor,
             $this->transactionIsolation,

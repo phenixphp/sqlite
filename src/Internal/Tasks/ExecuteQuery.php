@@ -24,6 +24,9 @@ class ExecuteQuery extends ConnectDatabase
     public function run(Channel $channel, Cancellation $cancellation): Result
     {
         try {
+            // Store database path for transaction tasks
+            $GLOBALS['current_db_path'] = $this->config->getPath();
+
             $pdo = $this->connect();
 
             $stmt = $pdo->query($this->sql);

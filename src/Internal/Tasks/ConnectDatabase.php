@@ -31,6 +31,24 @@ class ConnectDatabase implements Task
 
     protected function connect(): PDO
     {
+        // Try to use persistent connection from bootstrap
+        $getConnection = $GLOBALS['getConnection'] ?? null;
+
+        if ($getConnection !== null) {
+            $pdo = $getConnection($this->config->getPath());
+
+            // Only apply PRAGMAs if this is a new connection
+            // Check if PRAGMAs were already applied by checking a marker
+            $markerKey = 'sqlite_pragmas_applied_' . md5($this->config->getPath());
+            if (! isset($GLOBALS[$markerKey])) {
+                $this->applyPragmas($pdo);
+                $GLOBALS[$markerKey] = true;
+            }
+
+            return $pdo;
+        }
+
+        // Fallback for environments without bootstrap (e.g., tests)
         $dsn = sprintf(
             'sqlite:%s',
             $this->config->getPath()
@@ -43,6 +61,13 @@ class ConnectDatabase implements Task
 
         $pdo = new PDO($dsn, null, null, $options);
 
+        $this->applyPragmas($pdo);
+
+        return $pdo;
+    }
+
+    protected function applyPragmas(PDO $pdo): void
+    {
         $pdo->exec(sprintf('PRAGMA busy_timeout = %d', $this->config->getBusyTimeout()));
 
         if ($this->config->getJournalMode() !== null) {
@@ -69,7 +94,5 @@ class ConnectDatabase implements Task
         if ($this->config->getCacheSize() !== null) {
             $pdo->exec(sprintf('PRAGMA cache_size = %d', $this->config->getCacheSize()));
         }
-
-        return $pdo;
     }
 }
