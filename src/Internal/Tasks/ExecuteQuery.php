@@ -10,7 +10,6 @@ use PDO;
 use PDOStatement;
 use Phenix\Sqlite\Constants\SqliteDataType;
 use Phenix\Sqlite\SqliteConfig;
-use Phenix\Sqlite\Internal\ConnectionContext;
 use Throwable;
 
 class ExecuteQuery extends ConnectDatabase
@@ -25,7 +24,6 @@ class ExecuteQuery extends ConnectDatabase
     public function run(Channel $channel, Cancellation $cancellation): Result
     {
         try {
-            // Ensure connection is established with PRAGMAs
             $pdo = $this->connect();
 
             $stmt = $pdo->query($this->sql);

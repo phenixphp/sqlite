@@ -18,6 +18,7 @@ use Phenix\Sqlite\Constants\SqliteDataType;
 use Phenix\Sqlite\Internal\Exceptions\ConnectionFailureException;
 use Phenix\Sqlite\Internal\Tasks\ConnectDatabase;
 use Phenix\Sqlite\Internal\Tasks\ExecuteQuery;
+use Phenix\Sqlite\Internal\Tasks\ExecuteTransactionQuery;
 use Phenix\Sqlite\Internal\Tasks\Result;
 use Phenix\Sqlite\SqliteColumnDefinition;
 use Phenix\Sqlite\SqliteConfig;
@@ -47,8 +48,6 @@ class ConnectionProcessor implements SqlTransientResource
 
     private Worker $worker;
 
-    private Worker|null $dedicatedWorker = null;
-
     private array $closeCallbacks = [];
 
     public function __construct(SqliteConfig $config, Worker|null $worker = null)
@@ -60,8 +59,7 @@ class ConnectionProcessor implements SqlTransientResource
         $this->deferreds = new SplQueue();
         $this->onReady = new SplQueue();
 
-        $this->worker = $worker ?? SqliteWorkerFactory::acquire();
-        // $this->worker = $worker ?? getWorker();
+        $this->worker = $worker ?? getWorker();
     }
 
     public function isClosed(): bool
@@ -123,39 +121,7 @@ class ConnectionProcessor implements SqlTransientResource
      */
     public function query(string $query): Future
     {
-        if ($this->isClosed()) {
-            throw new Error('The connection has been closed');
-        }
-
-        $execution = $this->worker->submit(new ExecuteQuery($this->config, $query));
-
-        /** @var Result $taskResult */
-        $taskResult = $execution->await();
-
-        if ($taskResult->failed()) {
-            $deferred = new DeferredFuture();
-            $deferred->error(new Error($taskResult->message() ?? "Query execution failed"));
-
-            return $deferred->getFuture();
-        }
-
-        $data = $taskResult->output();
-
-        $columnDefinitions = $this->buildColumnDefinitions($data['columnDefinitions']);
-
-        $result = new SqliteConnectionResult(
-            columnDefinitions: $columnDefinitions,
-            rows: $data['rows'],
-            lastInsertId: $data['lastInsertId'],
-            affectedRows: $data['affectedRows'],
-        );
-
-        $this->lastUsedAt = time();
-
-        $deferred = new DeferredFuture();
-        $deferred->complete($result);
-
-        return $deferred->getFuture();
+        return $this->executeQuery(new ExecuteQuery($this->config, $query));
     }
 
     /**
@@ -163,70 +129,26 @@ class ConnectionProcessor implements SqlTransientResource
      *
      * @return Future<SqliteConnectionResult>
      */
-    public function queryInTransaction(string $query): Future
+    public function transactionQuery(string $query): Future
     {
-        if ($this->isClosed()) {
-            throw new Error('The connection has been closed');
-        }
-
-        if ($this->dedicatedWorker === null) {
-            throw new Error('No active transaction');
-        }
-
-        $execution = $this->dedicatedWorker->submit(new Tasks\ExecuteTransactionQuery($this->config, $query));
-
-        /** @var Result $taskResult */
-        $taskResult = $execution->await();
-
-        if ($taskResult->failed()) {
-            $deferred = new DeferredFuture();
-            $deferred->error(new Error($taskResult->message() ?? "Query execution failed"));
-
-            return $deferred->getFuture();
-        }
-
-        $data = $taskResult->output();
-
-        $columnDefinitions = $this->buildColumnDefinitions($data['columnDefinitions']);
-
-        $result = new SqliteConnectionResult(
-            columnDefinitions: $columnDefinitions,
-            rows: $data['rows'],
-            lastInsertId: $data['lastInsertId'],
-            affectedRows: $data['affectedRows'],
-        );
-
-        $this->lastUsedAt = time();
-
-        $deferred = new DeferredFuture();
-        $deferred->complete($result);
-
-        return $deferred->getFuture();
+        return $this->executeQuery(new ExecuteTransactionQuery($this->config, $query));
     }
 
     /**
      * @return Future<bool>
      */
-    public function beginTransaction(string $transactionType): Future
+    public function beginTransaction(): Future
     {
         if ($this->isClosed()) {
             throw new Error('The connection has been closed');
         }
 
-        // Acquire dedicated worker for this transaction if not already acquired
-        if ($this->dedicatedWorker === null) {
-            $this->dedicatedWorker = SqliteWorkerFactory::acquireDedicated();
-        }
-
-        $execution = $this->dedicatedWorker->submit(new Tasks\BeginTransaction($this->config, $transactionType));
+        $execution = $this->worker->submit(new Tasks\BeginTransaction($this->config));
 
         /** @var Result $taskResult */
         $taskResult = $execution->await();
 
         if ($taskResult->failed()) {
-            // Release dedicated worker on failure
-            $this->releaseDedicatedWorker();
-
             $deferred = new DeferredFuture();
             $deferred->error(new Error($taskResult->message() ?? "Failed to begin transaction"));
 
@@ -250,19 +172,10 @@ class ConnectionProcessor implements SqlTransientResource
             throw new Error('The connection has been closed');
         }
 
-        if ($this->dedicatedWorker === null) {
-            $deferred = new DeferredFuture();
-            $deferred->error(new Error("No active transaction to commit"));
-            return $deferred->getFuture();
-        }
-
-        $execution = $this->dedicatedWorker->submit(new Tasks\CommitTransaction($this->config));
+        $execution = $this->worker->submit(new Tasks\CommitTransaction($this->config));
 
         /** @var Result $taskResult */
         $taskResult = $execution->await();
-
-        // Always release dedicated worker after commit attempt
-        $this->releaseDedicatedWorker();
 
         if ($taskResult->failed()) {
             $deferred = new DeferredFuture();
@@ -288,19 +201,11 @@ class ConnectionProcessor implements SqlTransientResource
             throw new Error('The connection has been closed');
         }
 
-        if ($this->dedicatedWorker === null) {
-            $deferred = new DeferredFuture();
-            $deferred->error(new Error("No active transaction to rollback"));
-            return $deferred->getFuture();
-        }
+        $execution = $this->worker->submit(new Tasks\RollbackTransaction($this->config));
 
-        $execution = $this->dedicatedWorker->submit(new Tasks\RollbackTransaction($this->config));
 
         /** @var Result $taskResult */
         $taskResult = $execution->await();
-
-        // Always release dedicated worker after rollback attempt
-        $this->releaseDedicatedWorker();
 
         if ($taskResult->failed()) {
             $deferred = new DeferredFuture();
@@ -355,12 +260,6 @@ class ConnectionProcessor implements SqlTransientResource
 
         $this->connectionState = ConnectionState::Closing;
 
-        // Release dedicated worker if active transaction
-        $this->releaseDedicatedWorker();
-
-        // Release regular worker back to pool
-        SqliteWorkerFactory::release($this->worker);
-
         $this->connectionState = ConnectionState::Closed;
 
         foreach ($this->closeCallbacks as $callback) {
@@ -368,15 +267,9 @@ class ConnectionProcessor implements SqlTransientResource
         }
     }
 
-    /**
-     * Release the dedicated worker back to the pool.
-     */
-    private function releaseDedicatedWorker(): void
+    public function shutdown(): void
     {
-        if ($this->dedicatedWorker !== null) {
-            SqliteWorkerFactory::releaseDedicated($this->dedicatedWorker);
-            $this->dedicatedWorker = null;
-        }
+        $this->worker->shutdown();
     }
 
     /**
@@ -416,5 +309,42 @@ class ConnectionProcessor implements SqlTransientResource
         }
 
         return $definitions;
+    }
+
+    private function executeQuery(ExecuteQuery|ExecuteTransactionQuery $task): Future
+    {
+        if ($this->isClosed()) {
+            throw new Error('The connection has been closed');
+        }
+
+        $execution = $this->worker->submit($task);
+
+        /** @var Result $taskResult */
+        $taskResult = $execution->await();
+
+        if ($taskResult->failed()) {
+            $deferred = new DeferredFuture();
+            $deferred->error(new Error($taskResult->message() ?? "Query execution failed"));
+
+            return $deferred->getFuture();
+        }
+
+        $data = $taskResult->output();
+
+        $columnDefinitions = $this->buildColumnDefinitions($data['columnDefinitions']);
+
+        $result = new SqliteConnectionResult(
+            columnDefinitions: $columnDefinitions,
+            rows: $data['rows'],
+            lastInsertId: $data['lastInsertId'],
+            affectedRows: $data['affectedRows'],
+        );
+
+        $this->lastUsedAt = time();
+
+        $deferred = new DeferredFuture();
+        $deferred->complete($result);
+
+        return $deferred->getFuture();
     }
 }

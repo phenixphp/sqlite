@@ -108,21 +108,8 @@ class SqliteConnection implements SqliteConnectionContract
 
         $processor = new Internal\ConnectionProcessor($this->config, SqliteWorkerFactory::create());
 
-        // SQLite supports: DEFERRED, IMMEDIATE, EXCLUSIVE transactions
-        // Map SQL standard isolation levels to SQLite transaction types:
-        // - Uncommitted/Committed -> DEFERRED (default, locks on first read/write)
-        // - Repeatable -> IMMEDIATE (locks database on BEGIN)
-        // - Serializable -> EXCLUSIVE (prevents all concurrent access)
-        $transactionType = match (true) {
-            $this->transactionIsolation === SqlTransactionIsolationLevel::Uncommitted => "BEGIN DEFERRED TRANSACTION",
-            $this->transactionIsolation === SqlTransactionIsolationLevel::Committed => "BEGIN DEFERRED TRANSACTION",
-            $this->transactionIsolation === SqlTransactionIsolationLevel::Repeatable => "BEGIN IMMEDIATE TRANSACTION",
-            $this->transactionIsolation === SqlTransactionIsolationLevel::Serializable => "BEGIN EXCLUSIVE TRANSACTION",
-            default => "BEGIN DEFERRED TRANSACTION",
-        };
-
         try {
-            $result = $processor->beginTransaction($transactionType)->await();
+            $result = $processor->beginTransaction()->await();
 
             if (! $result) {
                 throw new RuntimeException('Failed to begin transaction');

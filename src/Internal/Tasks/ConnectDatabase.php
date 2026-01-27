@@ -9,7 +9,6 @@ use Amp\Parallel\Worker\Task;
 use Amp\Sync\Channel;
 use PDO;
 use Phenix\Sqlite\SqliteConfig;
-use Phenix\Sqlite\Internal\ConnectionContext;
 use Throwable;
 
 use function sprintf;
@@ -34,17 +33,6 @@ class ConnectDatabase implements Task
 
     protected function connect(): PDO
     {
-        $dbPath = $this->config->getPath();
-
-        // // Get persistent connection from ConnectionContext
-        // $pdo = ConnectionContext::getConnection($dbPath);
-
-        // // Apply PRAGMAs only once per connection
-        // if (!ConnectionContext::arePragmasApplied($dbPath)) {
-        //     $this->applyPragmas($pdo);
-        //     ConnectionContext::markPragmasApplied($dbPath);
-        // }
-
         $dsn = sprintf(
             'sqlite:%s',
             $this->config->getPath()

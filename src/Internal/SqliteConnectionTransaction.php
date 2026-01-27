@@ -35,7 +35,7 @@ class SqliteConnectionTransaction implements SqliteTransaction
             throw new Error("Transaction is not active");
         }
 
-        return $this->processor->queryInTransaction($sql)->await();
+        return $this->processor->transactionQuery($sql)->await();
     }
 
     public function prepare(string $sql): SqliteStatement
@@ -77,7 +77,7 @@ class SqliteConnectionTransaction implements SqliteTransaction
 
         // Handle nested transaction (savepoint)
         if ($this->savepointId !== null) {
-            $this->processor->query("RELEASE SAVEPOINT {$this->savepointId}")->await();
+            $this->processor->transactionQuery("RELEASE SAVEPOINT {$this->savepointId}")->await();
         } else {
             // Commit main transaction
             $this->processor->commitTransaction()->await();
@@ -89,6 +89,8 @@ class SqliteConnectionTransaction implements SqliteTransaction
         foreach ($this->onCommitCallbacks as $callback) {
             $callback();
         }
+
+        $this->processor->shutdown();
     }
 
     public function rollback(): void
@@ -99,8 +101,8 @@ class SqliteConnectionTransaction implements SqliteTransaction
 
         // Handle nested transaction (savepoint)
         if ($this->savepointId !== null) {
-            $this->processor->query("ROLLBACK TO SAVEPOINT {$this->savepointId}")->await();
-            $this->processor->query("RELEASE SAVEPOINT {$this->savepointId}")->await();
+            $this->processor->transactionQuery("ROLLBACK TO SAVEPOINT {$this->savepointId}")->await();
+            $this->processor->transactionQuery("RELEASE SAVEPOINT {$this->savepointId}")->await();
         } else {
             // Rollback main transaction
             $this->processor->rollbackTransaction()->await();
@@ -112,6 +114,8 @@ class SqliteConnectionTransaction implements SqliteTransaction
         foreach ($this->onRollbackCallbacks as $callback) {
             $callback();
         }
+
+        $this->processor->shutdown();
     }
 
     public function isActive(): bool
