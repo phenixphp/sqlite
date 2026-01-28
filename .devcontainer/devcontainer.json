@@ -14,7 +14,9 @@
 				"st-pham.php-refactor-tool",
 				"mehedidracula.php-namespace-resolver",
 				"devsense.composer-php-vscode",
-				"phiter.phpstorm-snippets"
+				"phiter.phpstorm-snippets",
+				"donjayamanne.githistory",
+				"eamodio.gitlens"
 			]
 		}
 	},
