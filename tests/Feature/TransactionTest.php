@@ -94,11 +94,14 @@ class TransactionTest extends TestCase
     public function it_releases_busy_lock_after_commit(): void
     {
         $transaction1 = $this->connection->beginTransaction();
+
         $transaction1->query("INSERT INTO users (name, email) VALUES ('User1', 'user1@example.com')");
         $transaction1->commit();
 
         $transaction2 = $this->connection->beginTransaction();
+
         $this->assertTrue($transaction2->isActive());
+
         $transaction2->rollback();
     }
 
@@ -110,7 +113,9 @@ class TransactionTest extends TestCase
         $transaction1->rollback();
 
         $transaction2 = $this->connection->beginTransaction();
+
         $this->assertTrue($transaction2->isActive());
+
         $transaction2->commit();
     }
 
@@ -120,19 +125,25 @@ class TransactionTest extends TestCase
         // Test DEFERRED transaction (default)
         $this->connection->setTransactionIsolation(SqlTransactionIsolationLevel::Committed);
         $transaction = $this->connection->beginTransaction();
+
         $this->assertEquals(SqlTransactionIsolationLevel::Committed, $transaction->getTransactionIsolation());
+
         $transaction->rollback();
 
         // Test IMMEDIATE transaction
         $this->connection->setTransactionIsolation(SqlTransactionIsolationLevel::Repeatable);
         $transaction = $this->connection->beginTransaction();
+
         $this->assertEquals(SqlTransactionIsolationLevel::Repeatable, $transaction->getTransactionIsolation());
+
         $transaction->rollback();
 
         // Test EXCLUSIVE transaction
         $this->connection->setTransactionIsolation(SqlTransactionIsolationLevel::Serializable);
         $transaction = $this->connection->beginTransaction();
+
         $this->assertEquals(SqlTransactionIsolationLevel::Serializable, $transaction->getTransactionIsolation());
+
         $transaction->rollback();
     }
 
@@ -172,5 +183,38 @@ class TransactionTest extends TestCase
         $result = $this->connection->query("SELECT email FROM users WHERE name = 'User1'");
         $row = $result->fetchRow();
         $this->assertEquals('updated@example.com', $row['email']);
+    }
+
+    /** @test */
+    public function it_allows_prepared_statements_in_transaction(): void
+    {
+        $transaction = $this->connection->beginTransaction();
+
+        $stmt = $transaction->prepare("INSERT INTO users (name, email) VALUES (?, ?)");
+        $stmt->execute(['Alice', 'alice@example.com']);
+        $stmt->execute(['Bob', 'bob@example.com']);
+
+        $transaction->commit();
+
+        $result = $this->connection->query("SELECT COUNT(*) as count FROM users");
+        $row = $result->fetchRow();
+
+        $this->assertEquals(2, $row['count']);
+    }
+
+    /** @test */
+    public function it_allows_select_prepared_statements_in_transaction(): void
+    {
+        $this->connection->query("INSERT INTO users (name, email) VALUES ('Charlie', 'charlie@example.com')");
+        $transaction = $this->connection->beginTransaction();
+
+        $stmt = $transaction->prepare("SELECT * FROM users WHERE name = ?");
+        $result = $stmt->execute(['Charlie']);
+        $row = $result->fetchRow();
+
+        $this->assertEquals('Charlie', $row['name']);
+        $this->assertEquals('charlie@example.com', $row['email']);
+
+        $transaction->rollback();
     }
 }

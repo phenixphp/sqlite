@@ -6,6 +6,7 @@ namespace Phenix\Sqlite\Internal\Tasks;
 
 use Amp\Cancellation;
 use Amp\Sync\Channel;
+use PDO;
 use PDOException;
 use Phenix\Sqlite\SqliteConfig;
 
@@ -19,7 +20,7 @@ class ExecuteStatement extends ConnectDatabase
      * @param array<mixed> $params
      */
     public function __construct(
-        protected SqliteConfig $config,
+        SqliteConfig $config,
         protected string $sql,
         protected array $params,
     ) {
@@ -40,7 +41,7 @@ class ExecuteStatement extends ConnectDatabase
             foreach ($this->params as $key => $value) {
                 $param = is_int($key) ? $key + 1 : $key;
 
-                $stmt->bindValue($param, $value);
+                $stmt->bindValue($param, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
             }
 
             $stmt->execute();

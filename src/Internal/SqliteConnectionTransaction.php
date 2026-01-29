@@ -10,6 +10,7 @@ use Error;
 use Phenix\Sqlite\Contracts\SqliteResult;
 use Phenix\Sqlite\Contracts\SqliteStatement;
 use Phenix\Sqlite\Contracts\SqliteTransaction;
+use Phenix\Sqlite\Internal\Exceptions\QueryExecutionException;
 
 class SqliteConnectionTransaction implements SqliteTransaction
 {
@@ -22,7 +23,7 @@ class SqliteConnectionTransaction implements SqliteTransaction
     private array $onRollbackCallbacks = [];
 
     public function __construct(
-        private readonly ConnectionProcessor $processor,
+        private readonly TransactionConnectionProcessor $processor,
         private readonly SqlTransactionIsolation $isolation,
         private readonly Closure $release,
         private readonly string|null $savepointId = null,
@@ -32,20 +33,30 @@ class SqliteConnectionTransaction implements SqliteTransaction
     public function query(string $sql): SqliteResult
     {
         if (! $this->active) {
-            throw new Error("Transaction is not active");
+            throw new Error('Transaction is not active');
         }
 
-        return $this->processor->transactionQuery($sql)->await();
+        return $this->processor->query($sql)->await();
     }
 
     public function prepare(string $sql): SqliteStatement
     {
         if (! $this->active) {
-            throw new Error("Transaction is not active");
+            throw new Error('Transaction is not active');
         }
 
-        // TODO: Implement prepare within transaction context
-        return $this->processor->prepare($sql)->await();
+        $data = $this->processor->prepare($sql)->await();
+
+        if ($data instanceof Error) {
+            throw new QueryExecutionException('Failed to prepare statement: ' . $data->getMessage());
+        }
+
+        return new SqliteConnectionStatement(
+            processor: $this->processor,
+            sql: $sql,
+            parameterCount: $data['parameterCount'] ?? 0,
+            columnDefinitions: $data['columnDefinitions'] ?? [],
+        );
     }
 
     public function execute(string $sql, array $params = []): SqliteResult
@@ -77,7 +88,7 @@ class SqliteConnectionTransaction implements SqliteTransaction
 
         // Handle nested transaction (savepoint)
         if ($this->savepointId !== null) {
-            $this->processor->transactionQuery("RELEASE SAVEPOINT {$this->savepointId}")->await();
+            $this->processor->query("RELEASE SAVEPOINT {$this->savepointId}")->await();
         } else {
             // Commit main transaction
             $this->processor->commitTransaction()->await();
@@ -101,8 +112,8 @@ class SqliteConnectionTransaction implements SqliteTransaction
 
         // Handle nested transaction (savepoint)
         if ($this->savepointId !== null) {
-            $this->processor->transactionQuery("ROLLBACK TO SAVEPOINT {$this->savepointId}")->await();
-            $this->processor->transactionQuery("RELEASE SAVEPOINT {$this->savepointId}")->await();
+            $this->processor->query("ROLLBACK TO SAVEPOINT {$this->savepointId}")->await();
+            $this->processor->query("RELEASE SAVEPOINT {$this->savepointId}")->await();
         } else {
             // Rollback main transaction
             $this->processor->rollbackTransaction()->await();

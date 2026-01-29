@@ -125,4 +125,11 @@ class ConnectDatabase implements Task
             default => SqliteDataType::Text->name,
         };
     }
+
+    protected function countParameters(string $sql): int
+    {
+        $count = preg_match_all('/\?|:[a-zA-Z_][a-zA-Z0-9_]*/', $sql, $matches);
+
+        return $count ?: 0;
+    }
 }

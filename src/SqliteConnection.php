@@ -108,7 +108,7 @@ class SqliteConnection implements SqliteConnectionContract
 
         $this->busy = $deferred = new DeferredFuture();
 
-        $processor = new Internal\ConnectionProcessor($this->config, SqliteWorkerFactory::create());
+        $processor = new Internal\TransactionConnectionProcessor($this->config, SqliteWorkerFactory::create());
 
         try {
             $result = $processor->beginTransaction()->await();

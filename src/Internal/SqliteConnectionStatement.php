@@ -59,7 +59,9 @@ class SqliteConnectionStatement implements SqliteStatement
 
         $this->lastUsedAt = time();
 
-        $this->processor->shutdown();
+        if ($this->processor::class === ConnectionProcessor::class) {
+            $this->processor->shutdown();
+        }
 
         return $result;
     }

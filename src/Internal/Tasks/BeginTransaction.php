@@ -6,17 +6,10 @@ namespace Phenix\Sqlite\Internal\Tasks;
 
 use Amp\Cancellation;
 use Amp\Sync\Channel;
-use Phenix\Sqlite\SqliteConfig;
 use Throwable;
 
 class BeginTransaction extends TransactionTask
 {
-    public function __construct(
-        SqliteConfig $config,
-    ) {
-        parent::__construct($config);
-    }
-
     public function run(Channel $channel, Cancellation $cancellation): Result
     {
         try {

@@ -19,7 +19,6 @@ use Phenix\Sqlite\Constants\SqliteDataType;
 use Phenix\Sqlite\Internal\Exceptions\ConnectionFailureException;
 use Phenix\Sqlite\Internal\Tasks\ConnectDatabase;
 use Phenix\Sqlite\Internal\Tasks\ExecuteQuery;
-use Phenix\Sqlite\Internal\Tasks\ExecuteTransactionQuery;
 use Phenix\Sqlite\Internal\Tasks\Result;
 use Phenix\Sqlite\SqliteColumnDefinition;
 use Phenix\Sqlite\SqliteConfig;
@@ -33,23 +32,23 @@ class ConnectionProcessor implements SqlTransientResource
     use ForbidCloning;
     use ForbidSerialization;
 
-    private SqliteConfig $config;
+    protected SqliteConfig $config;
 
-    private readonly SqliteConnectionMetadata $metadata;
+    protected readonly SqliteConnectionMetadata $metadata;
 
     /** @var SplQueue<DeferredFuture> */
-    private readonly SplQueue $deferreds;
+    protected readonly SplQueue $deferreds;
 
     /** @var SplQueue<Closure():void> */
-    private readonly SplQueue $onReady;
+    protected readonly SplQueue $onReady;
 
-    private int $lastUsedAt;
+    protected int $lastUsedAt;
 
-    private ConnectionState $connectionState = ConnectionState::Unconnected;
+    protected ConnectionState $connectionState = ConnectionState::Unconnected;
 
-    private Worker $worker;
+    protected Worker $worker;
 
-    private array $closeCallbacks = [];
+    protected array $closeCallbacks = [];
 
     public function __construct(SqliteConfig $config, Worker|null $worker = null)
     {
@@ -123,16 +122,6 @@ class ConnectionProcessor implements SqlTransientResource
     public function query(string $query): Future
     {
         return $this->executeQuery(new ExecuteQuery($this->config, $query));
-    }
-
-    /**
-     * Execute a query within a transaction using the dedicated worker.
-     *
-     * @return Future<SqliteConnectionResult>
-     */
-    public function transactionQuery(string $query): Future
-    {
-        return $this->executeQuery(new ExecuteTransactionQuery($this->config, $query));
     }
 
     /**
@@ -223,36 +212,9 @@ class ConnectionProcessor implements SqlTransientResource
         return $deferred->getFuture();
     }
 
-    /**
-     * @return Future<array{parameterCount: int, columnDefinitions: array<array{name: string, type: string, declaredType: string|null, table: string|null, length: int, flags: int, decimals: int}>}>
-     */
     public function prepare(string $sql): Future
     {
-        if ($this->isClosed()) {
-            throw new Error('The connection has been closed');
-        }
-
-        $execution = $this->worker->submit(new Tasks\PrepareStatement($this->config, $sql));
-
-        /** @var Result $taskResult */
-        $taskResult = $execution->await();
-
-        if ($taskResult->failed()) {
-            $deferred = new DeferredFuture();
-            $deferred->error(new Error($taskResult->message() ?? "Failed to prepare statement"));
-
-            return $deferred->getFuture();
-        }
-
-        $this->lastUsedAt = time();
-
-        $data = $taskResult->output();
-        $data['columnDefinitions'] = $this->buildColumnDefinitions($data['columnDefinitions'] ?? null);
-
-        $deferred = new DeferredFuture();
-        $deferred->complete($data);
-
-        return $deferred->getFuture();
+        return $this->executePrepare(new Tasks\PrepareStatement($this->config, $sql));
     }
 
     public function execute(string $sql, array $params = []): Future
@@ -284,7 +246,7 @@ class ConnectionProcessor implements SqlTransientResource
      * @param array<array{name: string, type: string, declaredType: string|null, table: string|null, length: int, flags: int, decimals: int}>|null $columnData
      * @return array<SqliteColumnDefinition>|null
      */
-    private function buildColumnDefinitions(array|null $columnData): array|null
+    protected function buildColumnDefinitions(array|null $columnData): array|null
     {
         if ($columnData === null) {
             return null;
@@ -320,7 +282,7 @@ class ConnectionProcessor implements SqlTransientResource
         return $definitions;
     }
 
-    private function executeQuery(Task $task): Future
+    protected function executeQuery(Task $task): Future
     {
         if ($this->isClosed()) {
             throw new Error('The connection has been closed');
@@ -353,6 +315,38 @@ class ConnectionProcessor implements SqlTransientResource
 
         $deferred = new DeferredFuture();
         $deferred->complete($result);
+
+        return $deferred->getFuture();
+    }
+
+    /**
+     * @return Future<array{parameterCount: int, columnDefinitions: array<array{name: string, type: string, declaredType: string|null, table: string|null, length: int, flags: int, decimals: int}>}>
+     */
+    protected function executePrepare(Task $task): Future
+    {
+        if ($this->isClosed()) {
+            throw new Error('The connection has been closed');
+        }
+
+        $execution = $this->worker->submit($task);
+
+        /** @var Result $taskResult */
+        $taskResult = $execution->await();
+
+        if ($taskResult->failed()) {
+            $deferred = new DeferredFuture();
+            $deferred->error(new Error($taskResult->message() ?? "Failed to prepare statement"));
+
+            return $deferred->getFuture();
+        }
+
+        $this->lastUsedAt = time();
+
+        $data = $taskResult->output();
+        $data['columnDefinitions'] = $this->buildColumnDefinitions($data['columnDefinitions'] ?? null);
+
+        $deferred = new DeferredFuture();
+        $deferred->complete($data);
 
         return $deferred->getFuture();
     }
