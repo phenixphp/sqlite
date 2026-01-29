@@ -122,7 +122,7 @@ class TransactionTest extends TestCase
     /** @test */
     public function it_respects_transaction_isolation_level(): void
     {
-        // Test DEFERRED transaction (default)
+        // DEFERRED (default)
         $this->connection->setTransactionIsolation(SqlTransactionIsolationLevel::Committed);
         $transaction = $this->connection->beginTransaction();
 
@@ -130,7 +130,7 @@ class TransactionTest extends TestCase
 
         $transaction->rollback();
 
-        // Test IMMEDIATE transaction
+        // IMMEDIATE
         $this->connection->setTransactionIsolation(SqlTransactionIsolationLevel::Repeatable);
         $transaction = $this->connection->beginTransaction();
 
@@ -138,7 +138,7 @@ class TransactionTest extends TestCase
 
         $transaction->rollback();
 
-        // Test EXCLUSIVE transaction
+        // EXCLUSIVE
         $this->connection->setTransactionIsolation(SqlTransactionIsolationLevel::Serializable);
         $transaction = $this->connection->beginTransaction();
 
