@@ -50,22 +50,7 @@ class ExecuteStatement extends ConnectDatabase
             $lastInsertId = $pdo->lastInsertId() ?: null;
             $affectedRows = $stmt->rowCount();
 
-            $columnDefinitions = [];
-            $colCount = $stmt->columnCount();
-
-            for ($i = 0; $i < $colCount; ++$i) {
-                $meta = $stmt->getColumnMeta($i);
-
-                $columnDefinitions[] = [
-                    'name' => $meta['name'] ?? '',
-                    'type' => $meta['native_type'] ?? 'Text',
-                    'declaredType' => $meta['sqlite:decl_type'] ?? null,
-                    'table' => $meta['table'] ?? null,
-                    'length' => $meta['len'] ?? 0,
-                    'flags' => 0,
-                    'decimals' => 0,
-                ];
-            }
+            $columnDefinitions = $this->buildColumnDefinitions($stmt);
 
             return Result::success([
                 'rows' => $rows,

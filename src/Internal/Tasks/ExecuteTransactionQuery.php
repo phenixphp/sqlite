@@ -34,7 +34,7 @@ class ExecuteTransactionQuery extends TransactionTask
 
             if ($isSelect) {
                 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                $columnDefinitions = $this->extractColumnDefinitions($stmt);
+                $columnDefinitions = $this->buildColumnDefinitions($stmt);
 
                 return Result::success([
                     'rows' => $rows,

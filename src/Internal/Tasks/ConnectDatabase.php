@@ -86,7 +86,7 @@ class ConnectDatabase implements Task
     /**
      * @return array<array{name: string, type: string, declaredType: string|null, table: string|null, length: int, flags: int, decimals: int}>
      */
-    protected function extractColumnDefinitions(PDOStatement $stmt): array
+    protected function buildColumnDefinitions(PDOStatement $stmt): array
     {
         $columnCount = $stmt->columnCount();
         $definitions = [];
@@ -99,10 +99,10 @@ class ConnectDatabase implements Task
             }
 
             $typeSource = $meta['sqlite:decl_type'] ?? $meta['native_type'] ?? 'TEXT';
-            $sqliteType = $this->mapPdoTypeToSqliteType($typeSource);
+            $sqliteType = $this->mapToSqliteType($typeSource);
 
             $definitions[] = [
-                'name' => $meta['name'] ?? "column_$i",
+                'name' => $meta['name'] ?? "column_{$i}",
                 'type' => $sqliteType,
                 'declaredType' => $meta['sqlite:decl_type'] ?? null,
                 'table' => $meta['table'] ?? null,
@@ -115,7 +115,7 @@ class ConnectDatabase implements Task
         return $definitions;
     }
 
-    protected function mapPdoTypeToSqliteType(string $nativeType): string
+    protected function mapToSqliteType(string $nativeType): string
     {
         return match (strtoupper($nativeType)) {
             'INTEGER' => SqliteDataType::Integer->name,

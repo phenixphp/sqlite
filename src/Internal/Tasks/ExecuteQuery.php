@@ -30,7 +30,7 @@ class ExecuteQuery extends ConnectDatabase
 
             if ($isSelect) {
                 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                $columnDefinitions = $this->extractColumnDefinitions($stmt);
+                $columnDefinitions = $this->buildColumnDefinitions($stmt);
 
                 return Result::success([
                     'rows' => $rows,
