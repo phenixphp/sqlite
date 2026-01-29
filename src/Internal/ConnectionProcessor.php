@@ -98,7 +98,7 @@ class ConnectionProcessor implements SqlTransientResource
     public function connect(null|Cancellation $cancellation = null): void
     {
         if ($this->connectionState !== ConnectionState::Unconnected) {
-            throw new Error('Connection already established');
+            throw new ConnectionFailureException('Connection already established');
         }
 
         $this->connectionState = ConnectionState::Connecting;
@@ -130,7 +130,7 @@ class ConnectionProcessor implements SqlTransientResource
     public function beginTransaction(): Future
     {
         if ($this->isClosed()) {
-            throw new Error('The connection has been closed');
+            $this->throwConnectionException();
         }
 
         $execution = $this->worker->submit(new Tasks\BeginTransaction($this->config));
@@ -159,7 +159,7 @@ class ConnectionProcessor implements SqlTransientResource
     public function commitTransaction(): Future
     {
         if ($this->isClosed()) {
-            throw new Error('The connection has been closed');
+            $this->throwConnectionException();
         }
 
         $execution = $this->worker->submit(new Tasks\CommitTransaction($this->config));
@@ -188,7 +188,7 @@ class ConnectionProcessor implements SqlTransientResource
     public function rollbackTransaction(): Future
     {
         if ($this->isClosed()) {
-            throw new Error('The connection has been closed');
+            $this->throwConnectionException();
         }
 
         $execution = $this->worker->submit(new Tasks\RollbackTransaction($this->config));
@@ -285,7 +285,7 @@ class ConnectionProcessor implements SqlTransientResource
     protected function executeQuery(Task $task): Future
     {
         if ($this->isClosed()) {
-            throw new Error('The connection has been closed');
+            $this->throwConnectionException();
         }
 
         $execution = $this->worker->submit($task);
@@ -325,7 +325,7 @@ class ConnectionProcessor implements SqlTransientResource
     protected function executePrepare(Task $task): Future
     {
         if ($this->isClosed()) {
-            throw new Error('The connection has been closed');
+            $this->throwConnectionException();
         }
 
         $execution = $this->worker->submit($task);
@@ -349,5 +349,10 @@ class ConnectionProcessor implements SqlTransientResource
         $deferred->complete($data);
 
         return $deferred->getFuture();
+    }
+
+    protected function throwConnectionException(): never
+    {
+        throw new ConnectionFailureException('The connection has been closed');
     }
 }

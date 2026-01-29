@@ -16,10 +16,10 @@ use Phenix\Sqlite\Contracts\SqliteConnection as SqliteConnectionContract;
 use Phenix\Sqlite\Contracts\SqliteResult;
 use Phenix\Sqlite\Contracts\SqliteStatement;
 use Phenix\Sqlite\Contracts\SqliteTransaction;
+use Phenix\Sqlite\Internal\Exceptions\SqliteException;
 use Phenix\Sqlite\Internal\SqliteConnectionStatement;
 use Phenix\Sqlite\Internal\SqliteWorkerFactory;
 use Revolt\EventLoop;
-use RuntimeException;
 use Throwable;
 
 class SqliteConnection implements SqliteConnectionContract
@@ -114,7 +114,7 @@ class SqliteConnection implements SqliteConnectionContract
             $result = $processor->beginTransaction()->await();
 
             if (! $result) {
-                throw new RuntimeException('Failed to begin transaction');
+                throw new SqliteException('Failed to begin transaction');
             }
         } catch (Throwable $exception) {
             $this->busy = null;
@@ -147,7 +147,7 @@ class SqliteConnection implements SqliteConnectionContract
             $data = $processor->prepare($sql)->await();
 
             if ($data instanceof Error) {
-                throw new RuntimeException('Failed to prepare statement: ' . $data->getMessage());
+                throw new SqliteException('Failed to prepare statement: ' . $data->getMessage());
             }
 
             $statement = new SqliteConnectionStatement(

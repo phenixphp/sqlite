@@ -6,7 +6,7 @@ namespace Phenix\Sqlite\Internal\Exceptions;
 
 use Exception;
 
-class QueryExecutionException extends Exception
+class SqliteTransactionException extends Exception
 {
     //
 }

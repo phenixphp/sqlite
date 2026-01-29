@@ -8,7 +8,7 @@ use Closure;
 use Error;
 use Phenix\Sqlite\Contracts\SqliteResult;
 use Phenix\Sqlite\Contracts\SqliteStatement;
-use Phenix\Sqlite\Internal\Exceptions\QueryExecutionException;
+use Phenix\Sqlite\Internal\Exceptions\SqliteException;
 use Phenix\Sqlite\SqliteColumnDefinition;
 
 use function is_int;
@@ -54,7 +54,7 @@ class SqliteConnectionStatement implements SqliteStatement
         if ($result instanceof Error) {
             $this->processor->shutdown();
 
-            throw new QueryExecutionException('Failed to execute statement: ' . $result->getMessage(), 0, $result);
+            throw new SqliteException('Failed to execute statement: ' . $result->getMessage(), 0, $result);
         }
 
         $this->lastUsedAt = time();
@@ -72,7 +72,7 @@ class SqliteConnectionStatement implements SqliteStatement
             throw new Error("Invalid parameter index: $paramId");
         }
 
-        if (is_string($paramId) && ! preg_match('/^:[a-zA-Z_][a-zA-Z0-9_]*$/', $paramId)) {
+        if (is_string($paramId) && ! preg_match('/^:[a-zA-Z_]\w*$/', $paramId)) {
             throw new Error("Invalid parameter name: $paramId");
         }
 

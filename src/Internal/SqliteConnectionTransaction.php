@@ -10,7 +10,8 @@ use Error;
 use Phenix\Sqlite\Contracts\SqliteResult;
 use Phenix\Sqlite\Contracts\SqliteStatement;
 use Phenix\Sqlite\Contracts\SqliteTransaction;
-use Phenix\Sqlite\Internal\Exceptions\QueryExecutionException;
+use Phenix\Sqlite\Internal\Exceptions\SqliteException;
+use Phenix\Sqlite\Internal\Exceptions\SqliteTransactionException;
 
 class SqliteConnectionTransaction implements SqliteTransaction
 {
@@ -33,7 +34,7 @@ class SqliteConnectionTransaction implements SqliteTransaction
     public function query(string $sql): SqliteResult
     {
         if (! $this->active) {
-            throw new Error('Transaction is not active');
+            $this->throwTransactionException();
         }
 
         return $this->processor->query($sql)->await();
@@ -42,13 +43,13 @@ class SqliteConnectionTransaction implements SqliteTransaction
     public function prepare(string $sql): SqliteStatement
     {
         if (! $this->active) {
-            throw new Error('Transaction is not active');
+            $this->throwTransactionException();
         }
 
         $data = $this->processor->prepare($sql)->await();
 
         if ($data instanceof Error) {
-            throw new QueryExecutionException('Failed to prepare statement: ' . $data->getMessage());
+            throw new SqliteException('Failed to prepare statement: ' . $data->getMessage());
         }
 
         return new SqliteConnectionStatement(
@@ -69,7 +70,7 @@ class SqliteConnectionTransaction implements SqliteTransaction
     public function beginTransaction(): SqliteTransaction
     {
         if (! $this->active) {
-            throw new Error("Transaction is not active");
+            $this->throwTransactionException();
         }
 
         // TODO: Implement nested transaction using SAVEPOINT
@@ -83,7 +84,7 @@ class SqliteConnectionTransaction implements SqliteTransaction
     public function commit(): void
     {
         if (! $this->active) {
-            throw new Error("Transaction is not active");
+            $this->throwTransactionException();
         }
 
         // Handle nested transaction (savepoint)
@@ -107,7 +108,7 @@ class SqliteConnectionTransaction implements SqliteTransaction
     public function rollback(): void
     {
         if (! $this->active) {
-            throw new Error("Transaction is not active");
+            $this->throwTransactionException();
         }
 
         // Handle nested transaction (savepoint)
@@ -141,7 +142,7 @@ class SqliteConnectionTransaction implements SqliteTransaction
 
     public function getIsolation(): SqlTransactionIsolation
     {
-        return $this->isolation;
+        return $this->getTransactionIsolation();
     }
 
     public function getSavepointIdentifier(): string|null
@@ -179,5 +180,10 @@ class SqliteConnectionTransaction implements SqliteTransaction
     public function onClose(Closure $onClose): void
     {
         $this->processor->onClose($onClose);
+    }
+
+    protected function throwTransactionException(): never
+    {
+        throw new SqliteTransactionException('Transaction is not active');
     }
 }
