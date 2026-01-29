@@ -13,7 +13,9 @@ use Phenix\Sqlite\Constants\SqliteDataType;
 use Phenix\Sqlite\SqliteConfig;
 use Throwable;
 
+use function count;
 use function is_array;
+use function is_int;
 use function sprintf;
 
 class ConnectDatabase implements Task
@@ -131,5 +133,81 @@ class ConnectDatabase implements Task
         $count = preg_match_all('/\?|:[a-zA-Z_][a-zA-Z0-9_]*/', $sql, $matches);
 
         return $count ?: 0;
+    }
+
+    protected function query(PDO $pdo, string $sql): Result
+    {
+        $stmt = $pdo->query($sql);
+
+        $isSelect = $stmt->columnCount() > 0;
+
+        if ($isSelect) {
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $columnDefinitions = $this->buildColumnDefinitions($stmt);
+
+            return Result::success([
+                'rows' => $rows,
+                'columnDefinitions' => $columnDefinitions,
+                'lastInsertId' => null,
+                'affectedRows' => count($rows),
+            ]);
+        }
+
+        $affectedRows = $stmt->rowCount();
+        $lastInsertId = $pdo->lastInsertId();
+
+        return Result::success([
+            'rows' => [],
+            'columnDefinitions' => null,
+            'lastInsertId' => $lastInsertId !== '0' ? (int) $lastInsertId : null,
+            'affectedRows' => $affectedRows,
+        ]);
+    }
+
+    protected function prepare(PDO $pdo, string $sql): Result
+    {
+        $stmt = $pdo->prepare($sql);
+
+        if (! $stmt) {
+            return Result::failure(message: "Failed to prepare statement: {$sql}");
+        }
+
+        $parameterCount = $this->countParameters($sql);
+        $columnDefinitions = $this->buildColumnDefinitions($stmt);
+
+        return Result::success([
+            'parameterCount' => $parameterCount,
+            'columnDefinitions' => $columnDefinitions,
+        ]);
+    }
+
+    protected function execute(PDO $pdo, string $sql, array $params): Result
+    {
+        $stmt = $pdo->prepare($sql);
+
+        if (! $stmt) {
+            return Result::failure(message: "Failed to prepare statement: {$sql}");
+        }
+
+        foreach ($params as $key => $value) {
+            $param = is_int($key) ? $key + 1 : $key;
+
+            $stmt->bindValue($param, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
+
+        $stmt->execute();
+
+        $rows = $stmt->fetchAll();
+        $lastInsertId = $pdo->lastInsertId() ?: null;
+        $affectedRows = $stmt->rowCount();
+
+        $columnDefinitions = $this->buildColumnDefinitions($stmt);
+
+        return Result::success([
+            'rows' => $rows,
+            'lastInsertId' => $lastInsertId !== null ? (int) $lastInsertId : null,
+            'affectedRows' => $affectedRows,
+            'columnDefinitions' => $columnDefinitions,
+        ]);
     }
 }
