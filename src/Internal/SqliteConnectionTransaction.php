@@ -73,12 +73,16 @@ class SqliteConnectionTransaction implements SqliteTransaction
             $this->throwTransactionException();
         }
 
-        // TODO: Implement nested transaction using SAVEPOINT
-        // SQLite doesn't support nested BEGIN/COMMIT, use SAVEPOINT instead:
-        // 1. Generate unique savepoint name
-        // 2. Execute "SAVEPOINT sp_name"
-        // 3. Return new SqliteConnectionTransaction with savepoint release logic
-        throw new Error("Nested transactions (SAVEPOINTs) not yet implemented");
+        $savepointId = 'sp_' . uniqid();
+
+        $this->processor->query("SAVEPOINT {$savepointId}")->await();
+
+        return new self(
+            $this->processor,
+            $this->isolation,
+            $this->release,
+            $savepointId
+        );
     }
 
     public function commit(): void
@@ -87,11 +91,9 @@ class SqliteConnectionTransaction implements SqliteTransaction
             $this->throwTransactionException();
         }
 
-        // Handle nested transaction (savepoint)
         if ($this->savepointId !== null) {
             $this->processor->query("RELEASE SAVEPOINT {$this->savepointId}")->await();
         } else {
-            // Commit main transaction
             $this->processor->commitTransaction()->await();
         }
 
@@ -102,7 +104,9 @@ class SqliteConnectionTransaction implements SqliteTransaction
             $callback();
         }
 
-        $this->processor->shutdown();
+        if ($this->savepointId === null) {
+            $this->processor->shutdown();
+        }
     }
 
     public function rollback(): void
@@ -111,12 +115,10 @@ class SqliteConnectionTransaction implements SqliteTransaction
             $this->throwTransactionException();
         }
 
-        // Handle nested transaction (savepoint)
         if ($this->savepointId !== null) {
             $this->processor->query("ROLLBACK TO SAVEPOINT {$this->savepointId}")->await();
             $this->processor->query("RELEASE SAVEPOINT {$this->savepointId}")->await();
         } else {
-            // Rollback main transaction
             $this->processor->rollbackTransaction()->await();
         }
 
@@ -127,7 +129,9 @@ class SqliteConnectionTransaction implements SqliteTransaction
             $callback();
         }
 
-        $this->processor->shutdown();
+        if ($this->savepointId === null) {
+            $this->processor->shutdown();
+        }
     }
 
     public function isActive(): bool

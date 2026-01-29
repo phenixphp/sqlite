@@ -217,4 +217,108 @@ class TransactionTest extends TestCase
 
         $transaction->rollback();
     }
+
+    /** @test */
+    public function it_supports_nested_transactions_with_savepoints(): void
+    {
+        $transaction = $this->connection->beginTransaction();
+
+        $transaction->query("INSERT INTO users (name, email) VALUES ('Outer', 'outer@example.com')");
+
+        $nested = $transaction->beginTransaction();
+        $nested->query("INSERT INTO users (name, email) VALUES ('Inner', 'inner@example.com')");
+
+        $nested->rollback();
+
+        $this->assertTrue($transaction->isActive());
+
+        $result = $transaction->query("SELECT COUNT(*) as count FROM users");
+        $row = $result->fetchRow();
+
+        $this->assertEquals(1, $row['count']);
+
+        $transaction->commit();
+
+        $result = $this->connection->query("SELECT name FROM users");
+
+        $names = [];
+
+        while ($row = $result->fetchRow()) {
+            $names[] = $row['name'];
+        }
+
+        $this->assertContains('Outer', $names);
+        $this->assertNotContains('Inner', $names);
+    }
+
+    /** @test */
+    public function it_commits_nested_transactions_independently(): void
+    {
+        $transaction = $this->connection->beginTransaction();
+        $transaction->query("INSERT INTO users (name, email) VALUES ('Outer', 'outer@example.com')");
+
+        $nested = $transaction->beginTransaction();
+        $nested->query("INSERT INTO users (name, email) VALUES ('Inner', 'inner@example.com')");
+        $nested->commit();
+
+        $result = $transaction->query("SELECT COUNT(*) as count FROM users");
+        $row = $result->fetchRow();
+        $this->assertEquals(2, $row['count']);
+
+        $transaction->commit();
+
+        $result = $this->connection->query("SELECT name FROM users");
+
+        $names = [];
+
+        while ($row = $result->fetchRow()) {
+            $names[] = $row['name'];
+        }
+
+        $this->assertContains('Outer', $names);
+        $this->assertContains('Inner', $names);
+    }
+
+    /** @test */
+    public function it_allows_multiple_levels_of_nested_transactions(): void
+    {
+        $outer = $this->connection->beginTransaction();
+        $outer->query("INSERT INTO users (name, email) VALUES ('Level1', 'l1@example.com')");
+
+        $mid = $outer->beginTransaction();
+        $mid->query("INSERT INTO users (name, email) VALUES ('Level2', 'l2@example.com')");
+
+        $inner = $mid->beginTransaction();
+        $inner->query("INSERT INTO users (name, email) VALUES ('Level3', 'l3@example.com')");
+
+        $inner->rollback();
+
+        $result = $mid->query("SELECT name FROM users");
+
+        $names = [];
+
+        while ($row = $result->fetchRow()) {
+            $names[] = $row['name'];
+        }
+
+        $this->assertContains('Level1', $names);
+        $this->assertContains('Level2', $names);
+        $this->assertNotContains('Level3', $names);
+
+        $mid->commit();
+
+        $outer->commit();
+
+        $result = $this->connection->query("SELECT name FROM users");
+
+        $names = [];
+
+        while ($row = $result->fetchRow()) {
+            $names[] = $row['name'];
+        }
+
+        $this->assertContains('Level1', $names);
+        $this->assertContains('Level2', $names);
+        $this->assertNotContains('Level3', $names);
+    }
 }
