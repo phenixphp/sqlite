@@ -24,25 +24,12 @@ class PrepareTransactionStatement extends TransactionTask
             $pdo = $this->connect();
 
             if (! $pdo->inTransaction()) {
-                return Result::failure(null, 'Not in a transaction - cannot execute  prepared statement|');
+                return Result::failure(message: "Not in a transaction, cannot execute prepared statement: {$this->sql}");
             }
 
-            $stmt = $pdo->prepare($this->sql);
-
-            if (! $stmt) {
-                return Result::failure(message: "Failed to prepare statement: {$this->sql}");
-            }
-
-            $parameterCount = $this->countParameters($this->sql);
-
-            $columnDefinitions = $this->buildColumnDefinitions($stmt);
-
-            return Result::success([
-                'parameterCount' => $parameterCount,
-                'columnDefinitions' => $columnDefinitions,
-            ]);
+            return $this->prepare($pdo, $this->sql);
         } catch (Throwable $e) {
-            return Result::failure(null, $e->getMessage());
+            return Result::failure(message: $e->getMessage());
         }
     }
 }

@@ -6,7 +6,6 @@ namespace Phenix\Sqlite\Internal\Tasks;
 
 use Amp\Cancellation;
 use Amp\Sync\Channel;
-use PDO;
 use Phenix\Sqlite\SqliteConfig;
 use Throwable;
 
@@ -24,31 +23,7 @@ class ExecuteQuery extends ConnectDatabase
         try {
             $pdo = $this->connect();
 
-            $stmt = $pdo->query($this->sql);
-
-            $isSelect = $stmt->columnCount() > 0;
-
-            if ($isSelect) {
-                $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                $columnDefinitions = $this->buildColumnDefinitions($stmt);
-
-                return Result::success([
-                    'rows' => $rows,
-                    'columnDefinitions' => $columnDefinitions,
-                    'lastInsertId' => null,
-                    'affectedRows' => count($rows),
-                ]);
-            }
-
-            $affectedRows = $stmt->rowCount();
-            $lastInsertId = $pdo->lastInsertId();
-
-            return Result::success([
-                'rows' => [],
-                'columnDefinitions' => null,
-                'lastInsertId' => $lastInsertId !== '0' ? (int) $lastInsertId : null,
-                'affectedRows' => $affectedRows,
-            ]);
+            return $this->query($pdo, $this->sql);
         } catch (Throwable $e) {
             return Result::failure(null, $e->getMessage());
         }
