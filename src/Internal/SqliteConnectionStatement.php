@@ -8,42 +8,73 @@ use Closure;
 use Error;
 use Phenix\Sqlite\Contracts\SqliteResult;
 use Phenix\Sqlite\Contracts\SqliteStatement;
+use Phenix\Sqlite\Internal\Exceptions\QueryExecutionException;
 use Phenix\Sqlite\SqliteColumnDefinition;
 
-/**
- * @internal
- */
+use function is_int;
+use function is_string;
+
 class SqliteConnectionStatement implements SqliteStatement
 {
+    private array $bindings;
+
+    private int $lastUsedAt;
+
+    private bool $closed;
+
     /**
      * @param array<SqliteColumnDefinition> $columnDefinitions
-     * @param array<SqliteColumnDefinition> $parameterDefinitions
      */
     public function __construct(
         private readonly ConnectionProcessor $processor,
         private readonly string $sql,
-        private readonly int|string $statementId,
-        private readonly array $columnDefinitions = [],
-        private readonly array $parameterDefinitions = [],
+        private readonly int $parameterCount,
+        private readonly array $columnDefinitions,
     ) {
+        $this->bindings = [];
+        $this->lastUsedAt = time();
+        $this->closed = false;
     }
 
     public function execute(array $params = []): SqliteResult
     {
-        // TODO: Implement statement execution
-        // 1. Submit execute task to worker with bound parameters
-        // 2. Parse result rows and column definitions
-        // 3. Return SqliteConnectionResult
-        throw new Error("Statement execution not yet implemented");
+        if ($this->closed) {
+            throw new Error('Statement is closed');
+        }
+
+        $bindings = $params ?: $this->bindings;
+
+        $execution = $this->processor->execute(
+            sql: $this->sql,
+            params: $bindings,
+        );
+
+        $result = $execution->await();
+
+        if ($result instanceof Error) {
+            $this->processor->shutdown();
+
+            throw new QueryExecutionException('Failed to execute statement: ' . $result->getMessage(), 0, $result);
+        }
+
+        $this->lastUsedAt = time();
+
+        $this->processor->shutdown();
+
+        return $result;
     }
 
     public function bind(int|string $paramId, string $data): void
     {
-        // TODO: Implement parameter binding
-        // 1. Validate paramId exists in parameterDefinitions
-        // 2. Submit bind task to worker
-        // 3. Store binding for next execute()
-        throw new Error("Parameter binding not yet implemented");
+        if (is_int($paramId) && ($paramId < 0 || $paramId >= $this->parameterCount)) {
+            throw new Error("Invalid parameter index: $paramId");
+        }
+
+        if (is_string($paramId) && ! preg_match('/^:[a-zA-Z_][a-zA-Z0-9_]*$/', $paramId)) {
+            throw new Error("Invalid parameter name: $paramId");
+        }
+
+        $this->bindings[$paramId] = $data;
     }
 
     public function getColumnDefinitions(): array
@@ -53,16 +84,12 @@ class SqliteConnectionStatement implements SqliteStatement
 
     public function getParameterDefinitions(): array
     {
-        return $this->parameterDefinitions;
+        return array_fill(0, $this->parameterCount, null);
     }
 
     public function reset(): void
     {
-        // TODO: Implement statement reset
-        // 1. Clear all parameter bindings
-        // 2. Reset statement state for reuse
-        // 3. Submit reset task to worker
-        throw new Error("Statement reset not yet implemented");
+        $this->bindings = [];
     }
 
     public function getQuery(): string
@@ -72,23 +99,24 @@ class SqliteConnectionStatement implements SqliteStatement
 
     public function getLastUsedAt(): int
     {
-        return $this->processor->getLastUsedAt();
+        return $this->lastUsedAt;
     }
 
     public function isClosed(): bool
     {
-        return $this->processor->isClosed();
+        return $this->closed;
     }
 
     public function close(): void
     {
-        // TODO: Implement statement close
-        // 1. Close statement handle on worker
-        // 2. Free resources
+        $this->closed = true;
+        $this->bindings = [];
+
+        $this->processor->shutdown();
     }
 
     public function onClose(Closure $onClose): void
     {
-        $this->processor->onClose($onClose);
+        // No operation needed
     }
 }

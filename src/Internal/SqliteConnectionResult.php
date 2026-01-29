@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace Phenix\Sqlite\Internal;
 
-use IteratorAggregate;
 use Phenix\Sqlite\Contracts\SqliteResult;
 use Phenix\Sqlite\SqliteColumnDefinition;
 use Traversable;
 
-class SqliteConnectionResult implements SqliteResult, IteratorAggregate
+class SqliteConnectionResult implements SqliteResult
 {
     /**
      * @param array<SqliteColumnDefinition>|null $columnDefinitions

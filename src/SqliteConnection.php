@@ -11,10 +11,12 @@ use Amp\ForbidSerialization;
 use Amp\Sql\SqlTransactionIsolation;
 use Amp\Sql\SqlTransactionIsolationLevel;
 use Closure;
+use Error;
 use Phenix\Sqlite\Contracts\SqliteConnection as SqliteConnectionContract;
 use Phenix\Sqlite\Contracts\SqliteResult;
 use Phenix\Sqlite\Contracts\SqliteStatement;
 use Phenix\Sqlite\Contracts\SqliteTransaction;
+use Phenix\Sqlite\Internal\SqliteConnectionStatement;
 use Phenix\Sqlite\Internal\SqliteWorkerFactory;
 use Revolt\EventLoop;
 use RuntimeException;
@@ -121,6 +123,9 @@ class SqliteConnection implements SqliteConnectionContract
             throw $exception;
         }
 
+        $this->busy = null;
+        $deferred->complete();
+
         return new Internal\SqliteConnectionTransaction(
             $processor,
             $this->transactionIsolation,
@@ -134,8 +139,34 @@ class SqliteConnection implements SqliteConnectionContract
             $this->busy->getFuture()->await();
         }
 
-        // TODO: Implement SQLite prepared statement
-        return $this->processor->prepare($sql)->await();
+        $this->busy = $deferred = new DeferredFuture();
+
+        $processor = new Internal\ConnectionProcessor($this->config, SqliteWorkerFactory::create());
+
+        try {
+            $data = $processor->prepare($sql)->await();
+
+            if ($data instanceof Error) {
+                throw new RuntimeException('Failed to prepare statement: ' . $data->getMessage());
+            }
+
+            $statement = new SqliteConnectionStatement(
+                processor: $processor,
+                sql: $sql,
+                parameterCount: $data['parameterCount'] ?? 0,
+                columnDefinitions: $data['columnDefinitions'] ?? [],
+            );
+        } catch (Throwable $exception) {
+            $this->busy = null;
+            $deferred->complete();
+
+            throw $exception;
+        }
+
+        $this->busy = null;
+        $deferred->complete();
+
+        return $statement;
     }
 
     public function execute(string $sql, array $params = []): SqliteResult

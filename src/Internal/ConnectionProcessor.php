@@ -9,6 +9,7 @@ use Amp\DeferredFuture;
 use Amp\ForbidCloning;
 use Amp\ForbidSerialization;
 use Amp\Future;
+use Amp\Parallel\Worker\Task;
 use Amp\Parallel\Worker\Worker;
 use Amp\Sql\SqlTransientResource;
 use Closure;
@@ -223,33 +224,40 @@ class ConnectionProcessor implements SqlTransientResource
     }
 
     /**
-     * @return Future<SqliteConnectionStatement>
+     * @return Future<array{parameterCount: int, columnDefinitions: array<array{name: string, type: string, declaredType: string|null, table: string|null, length: int, flags: int, decimals: int}>}>
      */
     public function prepare(string $sql): Future
     {
         if ($this->isClosed()) {
-            throw new Error("The connection has been closed");
+            throw new Error('The connection has been closed');
         }
 
-        // TODO: Implement prepared statement
-        // Strategy:
-        // 1. Parse parameter placeholders locally (? and :name)
-        // 2. Create PrepareStatement task with SQL and config
-        // 3. Task opens PDO in worker, calls prepare() to get metadata
-        // 4. Task returns serializable data:
-        //    - parameterCount: int
-        //    - columnDefinitions: array with metadata
-        // 5. Store SQL and metadata locally
-        // 6. Return SqliteConnectionStatement that will execute via ExecuteStatement task
-        // 7. Each execute() sends new task with SQL + bound params
-        // Note: Can't maintain persistent prepared statement across tasks
+        $execution = $this->worker->submit(new Tasks\PrepareStatement($this->config, $sql));
+
+        /** @var Result $taskResult */
+        $taskResult = $execution->await();
+
+        if ($taskResult->failed()) {
+            $deferred = new DeferredFuture();
+            $deferred->error(new Error($taskResult->message() ?? "Failed to prepare statement"));
+
+            return $deferred->getFuture();
+        }
 
         $this->lastUsedAt = time();
 
+        $data = $taskResult->output();
+        $data['columnDefinitions'] = $this->buildColumnDefinitions($data['columnDefinitions'] ?? null);
+
         $deferred = new DeferredFuture();
-        $deferred->error(new Error("Prepare not yet implemented"));
+        $deferred->complete($data);
 
         return $deferred->getFuture();
+    }
+
+    public function execute(string $sql, array $params = []): Future
+    {
+        return $this->executeQuery(new Tasks\ExecuteStatement($this->config, $sql, $params));
     }
 
     public function close(): void
@@ -283,6 +291,7 @@ class ConnectionProcessor implements SqlTransientResource
         }
 
         $definitions = [];
+
         foreach ($columnData as $column) {
             $typeEnum = match ($column['type']) {
                 'Null' => SqliteDataType::Null,
@@ -311,7 +320,7 @@ class ConnectionProcessor implements SqlTransientResource
         return $definitions;
     }
 
-    private function executeQuery(ExecuteQuery|ExecuteTransactionQuery $task): Future
+    private function executeQuery(Task $task): Future
     {
         if ($this->isClosed()) {
             throw new Error('The connection has been closed');
@@ -324,7 +333,7 @@ class ConnectionProcessor implements SqlTransientResource
 
         if ($taskResult->failed()) {
             $deferred = new DeferredFuture();
-            $deferred->error(new Error($taskResult->message() ?? "Query execution failed"));
+            $deferred->error(new Error($taskResult->message() ?? 'Query execution failed'));
 
             return $deferred->getFuture();
         }
