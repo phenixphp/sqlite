@@ -56,8 +56,6 @@ class SqliteConnectionResult implements SqliteResult
 
     public function getNextResult(): self|null
     {
-        // TODO: Implement multi-result support if needed
-        // SQLite doesn't typically return multiple result sets like MySQL
         return null;
     }
 }
