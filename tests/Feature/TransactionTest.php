@@ -4,9 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use Amp\DeferredFuture;
 use Amp\Sql\SqlTransactionIsolationLevel;
 use Phenix\Sqlite\SqliteConnection;
+use ReflectionClass;
 use Tests\TestCase;
+
+use function Amp\async;
+use function Amp\delay;
 
 class TransactionTest extends TestCase
 {
@@ -320,5 +325,37 @@ class TransactionTest extends TestCase
         $this->assertContains('Level1', $names);
         $this->assertContains('Level2', $names);
         $this->assertNotContains('Level3', $names);
+    }
+
+    /**
+     * @test
+     */
+    public function it_waits_when_begin_transaction_and_connection_is_busy(): void
+    {
+        $reflection = new ReflectionClass($this->connection);
+        $busyProperty = $reflection->getProperty('busy');
+        $busyProperty->setAccessible(true);
+
+        $deferred = new DeferredFuture();
+        $busyProperty->setValue($this->connection, $deferred);
+
+        $start = microtime(true);
+
+        $future = async(function () {
+            return $this->connection->beginTransaction();
+        });
+
+        delay(0.5);
+
+        $deferred->complete();
+        $busyProperty->setValue($this->connection, null);
+
+        $transaction = $future->await();
+        $elapsed = microtime(true) - $start;
+
+        $this->assertGreaterThanOrEqual(0.5, $elapsed, 'beginTransaction did not wait for busy connection to be released');
+        $this->assertTrue($transaction->isActive());
+
+        $transaction->rollback();
     }
 }

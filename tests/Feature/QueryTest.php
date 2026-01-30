@@ -4,9 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use Amp\DeferredFuture;
 use Phenix\Sqlite\Constants\SqliteDataType;
 use Phenix\Sqlite\SqliteColumnDefinition;
+use ReflectionClass;
 use Tests\TestCase;
+
+use function Amp\async;
+use function Amp\delay;
 
 class QueryTest extends TestCase
 {
@@ -316,6 +321,40 @@ class QueryTest extends TestCase
         $this->assertSame(30.0, $row['avg']);
         $this->assertSame(10, $row['min']);
         $this->assertSame(50, $row['max']);
+
+        $connection->close();
+    }
+
+    /**
+     * @test
+     */
+    public function it_waits_when_connection_is_busy(): void
+    {
+        $connection = $this->getConnection();
+
+        $reflection = new ReflectionClass($connection);
+        $busyProperty = $reflection->getProperty('busy');
+        $busyProperty->setAccessible(true);
+
+        $deferred = new DeferredFuture();
+        $busyProperty->setValue($connection, $deferred);
+
+        $start = microtime(true);
+
+        $future = async(function () use ($connection) {
+            return $connection->query('SELECT 1');
+        });
+
+        delay(0.5);
+
+        $deferred->complete();
+        $busyProperty->setValue($connection, null);
+
+        $result = $future->await();
+        $elapsed = microtime(true) - $start;
+
+        $this->assertGreaterThanOrEqual(0.5, $elapsed, 'Query did not wait for busy connection to be released');
+        $this->assertSame(1, $result->fetchRow()[1]);
 
         $connection->close();
     }
