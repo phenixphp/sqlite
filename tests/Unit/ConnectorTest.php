@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Unit;
 
-use TypeError;
-use Tests\TestCase;
 use Amp\Sql\SqlConfig;
 use Phenix\Sqlite\SqliteConnector;
+use Tests\TestCase;
+use TypeError;
 
 class ConnectorTest extends TestCase
 {
