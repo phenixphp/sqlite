@@ -18,6 +18,11 @@ class SqliteConnector implements SqlConnector
     use ForbidCloning;
     use ForbidSerialization;
 
+    public static function make(SqlConfig $config, null|Cancellation $cancellation = null): SqliteConnection
+    {
+        return (new self())->connect($config, $cancellation);
+    }
+
     public function connect(SqlConfig $config, null|Cancellation $cancellation = null): SqliteConnection
     {
         if (! $config instanceof SqliteConfig) {
