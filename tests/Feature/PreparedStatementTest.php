@@ -58,4 +58,15 @@ class PreparedStatementTest extends TestCase
         $this->assertCount(1, $rows);
         $this->assertSame('Dan', $rows[0]['name']);
     }
+
+    /** @test */
+    public function it_executes_query_directly(): void
+    {
+        $this->connection->query('CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, age INTEGER)');
+
+        $result = $this->connection->execute('INSERT INTO users (name, age) VALUES (?, ?)', ['Alice', 30]);
+
+        $this->assertSame(1, $result->getRowCount());
+        $this->assertNotNull($result->getLastInsertId());
+    }
 }
