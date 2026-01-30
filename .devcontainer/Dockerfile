@@ -15,6 +15,9 @@ RUN docker-php-ext-install \
     sockets \
     && docker-php-ext-enable pcntl sockets
 
+RUN pecl install xdebug \
+    && docker-php-ext-enable xdebug
+
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 ENV COMPOSER_ALLOW_SUPERUSER=1
