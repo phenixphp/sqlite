@@ -44,7 +44,7 @@
     "scripts": {
         "test": "XDEBUG_MODE=off vendor/bin/phpunit --colors=always --coverage-text",
         "test:debug": "vendor/bin/phpunit --colors=always --coverage-text",
-        "test:coverage": "XDEBUG_MODE=coverage vendor/bin/phpunit --colors=always --coverage-text --coverage",
+        "test:coverage": "XDEBUG_MODE=coverage vendor/bin/phpunit --colors=always",
         "format": "vendor/bin/php-cs-fixer fix",
         "analyze": "vendor/bin/phpstan --memory-limit=1G"
     }
