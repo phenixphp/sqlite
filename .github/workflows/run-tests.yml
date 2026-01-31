@@ -1,0 +1,57 @@
+name: run-tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.2
+          extensions: json, mbstring, pcntl, intl, fileinfo, sqlite, pdo_sqlite
+          coverage: pcov
+
+      - name: Setup problem matchers
+        run: |
+          echo "::add-matcher::${{ runner.tool_cache }}/php.json"
+          echo "::add-matcher::${{ runner.tool_cache }}/phpunit.json"
+
+      - name: Install dependencies
+        run: |
+          composer install --no-interaction --prefer-dist --no-progress --no-suggest
+
+      - name: Check code formatting with PHP CS Fixer
+        run: |
+          vendor/bin/php-cs-fixer fix --dry-run --diff --ansi
+
+      - name: Analyze code statically with PHPStan
+        run: |
+          vendor/bin/phpstan
+
+      - name: Execute tests
+        run: |
+          cp phpunit.xml.dist phpunit.xml
+          vendor/bin/pest --coverage
+
+      - name: Prepare paths for SonarQube analysis
+        run: |
+          sed -i "s|$GITHUB_WORKSPACE|/github/workspace|g" build/logs/clover.xml
+          sed -i "s|$GITHUB_WORKSPACE|/github/workspace|g" build/report.junit.xml
+
+      - name: Run SonarQube analysis
+        uses: sonarsource/sonarqube-scan-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
