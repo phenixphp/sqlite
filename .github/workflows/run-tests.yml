@@ -42,7 +42,7 @@ jobs:
 
       - name: Execute tests
         run: |
-          vendor/bin/phpunit
+          vendor/bin/phpunit --coverage-html
 
       - name: Prepare paths for SonarQube analysis
         run: |
