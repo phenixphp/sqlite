@@ -42,7 +42,7 @@ jobs:
 
       - name: Execute tests
         run: |
-          vendor/bin/phpunit --coverage-html build/coverage --log-junit build/report.junit.xml --coverage-clover build/logs/clover.xml --colors=always
+          vendor/bin/phpunit
 
       - name: Prepare paths for SonarQube analysis
         run: |
