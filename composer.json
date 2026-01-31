@@ -3,6 +3,7 @@
     "version": "0.0.1",
     "description": "Asynchronous SQLite client for PHP based on Amp.",
     "license": "MIT",
+    "homepage": "https://github.com/phenixphp/sqlite",
     "authors": [
         {
             "name": "Omar Barbosa",
@@ -42,8 +43,8 @@
         }
     },
     "scripts": {
-        "test": "XDEBUG_MODE=off vendor/bin/phpunit --colors=always --coverage-text",
-        "test:debug": "vendor/bin/phpunit --colors=always --coverage-text",
+        "test": "XDEBUG_MODE=off vendor/bin/phpunit --colors=always",
+        "test:debug": "vendor/bin/phpunit --colors=always",
         "test:coverage": "XDEBUG_MODE=coverage vendor/bin/phpunit --colors=always",
         "format": "vendor/bin/php-cs-fixer fix",
         "analyze": "vendor/bin/phpstan --memory-limit=1G"
