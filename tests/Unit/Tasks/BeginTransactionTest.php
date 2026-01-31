@@ -47,4 +47,20 @@ class BeginTransactionTest extends TestCase
         $this->assertTrue($result->failed());
         $this->assertStringContainsString('Error beginning transaction', $result->message() ?? '');
     }
+
+    /**
+     * @test
+     */
+    public function it_returns_failure_when_no_transaction_active(): void
+    {
+        $config = SqliteConfig::fromPath($this->getDatabasePath());
+
+        $task = new BeginTransaction($config);
+        $task->run($this->createMock(Channel::class), $this->createMock(Cancellation::class));
+
+        $secondTask = new BeginTransaction($config);
+        $result = $secondTask->run($this->createMock(Channel::class), $this->createMock(Cancellation::class));
+
+        $this->assertTrue($result->failed());
+    }
 }
