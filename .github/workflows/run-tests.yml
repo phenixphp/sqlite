@@ -42,8 +42,7 @@ jobs:
 
       - name: Execute tests
         run: |
-          cp phpunit.xml.dist phpunit.xml
-          vendor/bin/pest --coverage
+          vendor/bin/phpunit --testdox
 
       - name: Prepare paths for SonarQube analysis
         run: |
