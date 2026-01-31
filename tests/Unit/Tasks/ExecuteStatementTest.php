@@ -27,4 +27,17 @@ class ExecuteStatementTest extends TestCase
 
         $this->assertTrue($result->isSuccess());
     }
+
+    /**
+     * @test
+     */
+    public function it_fails_on_invalid_statement(): void
+    {
+        $config = SqliteConfig::fromPath($this->getDatabasePath());
+
+        $task = new ExecuteStatement($config, 'INVALID STATEMENT', []);
+        $result = $task->run($this->createMock(Channel::class), $this->createMock(Cancellation::class));
+
+        $this->assertFalse($result->isSuccess());
+    }
 }
