@@ -6,6 +6,8 @@ namespace Tests\Feature;
 
 use Amp\DeferredFuture;
 use Amp\Sql\SqlTransactionIsolationLevel;
+use Phenix\Sqlite\Internal\Exceptions\SqliteTransactionException;
+use Phenix\Sqlite\Internal\SqliteConnectionTransaction;
 use Phenix\Sqlite\SqliteConnection;
 use ReflectionClass;
 use Tests\TestCase;
@@ -36,9 +38,17 @@ class TransactionTest extends TestCase
     /** @test */
     public function it_begins_and_commits_transaction(): void
     {
+        /** @var SqliteConnectionTransaction $transaction */
         $transaction = $this->connection->beginTransaction();
 
         $this->assertTrue($transaction->isActive());
+        $this->assertNull($transaction->getSavepointIdentifier());
+
+        $counter = 0;
+
+        $transaction->onCommit(function () use (&$counter) {
+            $counter++;
+        });
 
         $transaction->query("INSERT INTO users (name, email) VALUES ('Alice', 'alice@example.com')");
         $transaction->query("INSERT INTO users (name, email) VALUES ('Bob', 'bob@example.com')");
@@ -46,7 +56,7 @@ class TransactionTest extends TestCase
         $transaction->commit();
 
         $this->assertFalse($transaction->isActive());
-
+        $this->assertEquals(1, $counter);
         $result = $this->connection->query("SELECT COUNT(*) as count FROM users");
         $row = $result->fetchRow();
 
@@ -357,5 +367,19 @@ class TransactionTest extends TestCase
         $this->assertTrue($transaction->isActive());
 
         $transaction->rollback();
+    }
+
+    /**
+     * @test
+     */
+    public function it_throws_if_commit_on_inactive_transaction(): void
+    {
+        $this->expectException(SqliteTransactionException::class);
+
+        $transaction = $this->connection->beginTransaction();
+        $transaction->commit();
+
+        // Second commit should throw
+        $transaction->commit();
     }
 }
