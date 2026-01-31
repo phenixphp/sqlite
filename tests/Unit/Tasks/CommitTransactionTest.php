@@ -15,13 +15,6 @@ use Phenix\Sqlite\Internal\Tasks\CommitTransaction;
 
 class CommitTransactionTest extends TestCase
 {
-    protected function tearDown(): void
-    {
-        parent::tearDown();
-
-        $GLOBALS['sqlite_connection'] = null;
-    }
-
     /**
      * @test
      */

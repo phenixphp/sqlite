@@ -12,6 +12,26 @@ class TestCase extends AsyncTestCase
 {
     protected string|null $databasePath = null;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $GLOBALS['sqlite_connection'] = null;
+    }
+
+    protected function tearDown(): void
+    {
+        parent::tearDown();
+
+        if ($this->databasePath !== null && file_exists($this->databasePath)) {
+            unlink($this->databasePath);
+        }
+
+        if (isset($GLOBALS['sqlite_connection'])) {
+            $GLOBALS['sqlite_connection'] = null;
+        }
+    }
+
     protected function getDatabasePath(): string
     {
         if ($this->databasePath === null) {
@@ -26,14 +46,5 @@ class TestCase extends AsyncTestCase
         $config = SqliteConfig::fromPath($this->getDatabasePath());
 
         return SqliteConnection::connect($config);
-    }
-
-    protected function tearDown(): void
-    {
-        parent::tearDown();
-
-        if ($this->databasePath !== null && file_exists($this->databasePath)) {
-            unlink($this->databasePath);
-        }
     }
 }
