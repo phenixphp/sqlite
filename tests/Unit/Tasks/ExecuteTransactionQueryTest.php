@@ -33,4 +33,20 @@ class ExecuteTransactionQueryTest extends TestCase
         $this->assertTrue($result->isSuccess());
         $this->assertIsArray($result->output()['rows'] ?? null);
     }
+
+    /**
+     * @test
+     */
+    public function it_returns_failure_on_invalid_query(): void
+    {
+        $config = SqliteConfig::fromPath($this->getDatabasePath());
+
+        $begin = new BeginTransaction($config);
+        $begin->run($this->createMock(Channel::class), $this->createMock(Cancellation::class));
+
+        $task = new ExecuteTransactionQuery($config, 'INVALID QUERY');
+        $result = $task->run($this->createMock(Channel::class), $this->createMock(Cancellation::class));
+
+        $this->assertFalse($result->isSuccess());
+    }
 }
