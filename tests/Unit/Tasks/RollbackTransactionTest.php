@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Tasks;
 
-use PDO;
-use Exception;
-use Tests\TestCase;
 use Amp\Cancellation;
 use Amp\Sync\Channel;
-use Phenix\Sqlite\SqliteConfig;
+use Exception;
+use PDO;
 use Phenix\Sqlite\Internal\Tasks\BeginTransaction;
 use Phenix\Sqlite\Internal\Tasks\RollbackTransaction;
+use Phenix\Sqlite\SqliteConfig;
+use Tests\TestCase;
 
 class RollbackTransactionTest extends TestCase
 {

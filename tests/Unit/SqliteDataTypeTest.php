@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use PHPUnit\Framework\TestCase;
 use Phenix\Sqlite\Constants\SqliteDataType;
+use PHPUnit\Framework\TestCase;
 
 class SqliteDataTypeTest extends TestCase
 {

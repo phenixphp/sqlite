@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Unit;
 
-use Tests\TestCase;
-use Phenix\Sqlite\SqliteColumnDefinition;
 use Phenix\Sqlite\Constants\SqliteDataType;
+use Phenix\Sqlite\SqliteColumnDefinition;
+use Tests\TestCase;
 
 class SqliteColumnDefinitionTest extends TestCase
 {

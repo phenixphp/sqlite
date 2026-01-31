@@ -2,17 +2,18 @@
 
 declare(strict_types=1);
 
-use PHPUnit\Framework\TestCase;
-use Phenix\Sqlite\Internal\SqliteConnectionStatement;
-use Phenix\Sqlite\Internal\ConnectionProcessor;
-use Phenix\Sqlite\SqliteColumnDefinition;
 use Phenix\Sqlite\Constants\SqliteDataType;
+use Phenix\Sqlite\Internal\ConnectionProcessor;
+use Phenix\Sqlite\Internal\SqliteConnectionStatement;
+use Phenix\Sqlite\SqliteColumnDefinition;
+use PHPUnit\Framework\TestCase;
 
 class SqliteConnectionStatementTest extends TestCase
 {
     private function makeStatement(array $columnDefs = [], int $paramCount = 2, string $sql = 'SELECT * FROM users WHERE id = ?')
     {
         $processor = $this->createMock(ConnectionProcessor::class);
+
         return new SqliteConnectionStatement(
             processor: $processor,
             sql: $sql,
@@ -83,7 +84,7 @@ class SqliteConnectionStatementTest extends TestCase
     public function it_on_close_noop(): void
     {
         $stmt = $this->makeStatement();
-        $stmt->onClose(fn() => null);
+        $stmt->onClose(fn () => null);
         $this->assertTrue(true); // No exception
     }
 
