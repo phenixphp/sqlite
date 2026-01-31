@@ -24,4 +24,17 @@ class PrepareStatementTest extends TestCase
 
         $this->assertTrue($result->isSuccess());
     }
+
+    /**
+     * @test
+     */
+    public function it_returns_failure_when_statement_is_invalid(): void
+    {
+        $config = SqliteConfig::fromPath($this->getDatabasePath());
+
+        $task = new PrepareStatement($config, 'INVALID STATEMENT');
+        $result = $task->run($this->createMock(Channel::class), $this->createMock(Cancellation::class));
+
+        $this->assertTrue($result->failed());
+    }
 }

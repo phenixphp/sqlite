@@ -49,4 +49,17 @@ class ExecuteTransactionQueryTest extends TestCase
 
         $this->assertFalse($result->isSuccess());
     }
+
+    /**
+     * @test
+     */
+    public function it_fails_when_no_transaction_active(): void
+    {
+        $config = SqliteConfig::fromPath($this->getDatabasePath());
+
+        $task = new ExecuteTransactionQuery($config, 'SELECT * FROM test');
+        $result = $task->run($this->createMock(Channel::class), $this->createMock(Cancellation::class));
+
+        $this->assertFalse($result->isSuccess());
+    }
 }

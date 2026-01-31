@@ -32,4 +32,33 @@ class ExecuteTransactionStatementTest extends TestCase
 
         $this->assertTrue($result->isSuccess());
     }
+
+    /**
+     * @test
+     */
+    public function it_returns_failure_on_invalid_statement(): void
+    {
+        $config = SqliteConfig::fromPath($this->getDatabasePath());
+
+        $begin = new BeginTransaction($config);
+        $begin->run($this->createMock(Channel::class), $this->createMock(Cancellation::class));
+
+        $task = new ExecuteTransactionStatement($config, 'INVALID STATEMENT', []);
+        $result = $task->run($this->createMock(Channel::class), $this->createMock(Cancellation::class));
+
+        $this->assertFalse($result->isSuccess());
+    }
+
+    /**
+     * @test
+     */
+    public function it_fails_when_no_transaction_active(): void
+    {
+        $config = SqliteConfig::fromPath($this->getDatabasePath());
+        $task = new ExecuteTransactionStatement($config, 'INSERT INTO test (id) VALUES (1)', []);
+
+        $result = $task->run($this->createMock(Channel::class), $this->createMock(Cancellation::class));
+
+        $this->assertFalse($result->isSuccess());
+    }
 }
