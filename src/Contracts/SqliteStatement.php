@@ -23,7 +23,7 @@ interface SqliteStatement extends SqlStatement
     public function getColumnDefinitions(): array;
 
     /**
-     * @return array<SqliteColumnDefinition>
+     * @return array<null>
      */
     public function getParameterDefinitions(): array;
 
