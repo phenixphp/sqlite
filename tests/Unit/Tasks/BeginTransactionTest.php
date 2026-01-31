@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Tasks;
 
+use PDO;
+use Tests\TestCase;
 use Amp\Cancellation;
 use Amp\Sync\Channel;
-use Phenix\Sqlite\Internal\Tasks\BeginTransaction;
+use Phenix\Sqlite\Internal\Exceptions\SqliteException;
 use Phenix\Sqlite\SqliteConfig;
-use Tests\TestCase;
+use Phenix\Sqlite\Internal\Tasks\BeginTransaction;
 
 class BeginTransactionTest extends TestCase
 {
@@ -24,5 +26,25 @@ class BeginTransactionTest extends TestCase
 
         $this->assertTrue($result->isSuccess());
         $this->assertTrue($result->output()['started'] ?? false);
+    }
+
+    /**
+     * @test
+     */
+    public function it_returns_failure_when_when_exception_is_thrown(): void
+    {
+        $config = SqliteConfig::fromPath($this->getDatabasePath());
+
+        $task = new class($config) extends BeginTransaction {
+            protected function connect(): PDO
+            {
+                throw new SqliteException('Error beginning transaction');
+            }
+        };
+
+        $result = $task->run($this->createMock(Channel::class), $this->createMock(Cancellation::class));
+
+        $this->assertTrue($result->failed());
+        $this->assertStringContainsString('Error beginning transaction', $result->message() ?? '');
     }
 }
