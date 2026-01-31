@@ -30,4 +30,17 @@ class ExecuteQueryTest extends TestCase
         $this->assertCount(0, $data['rows']);
 
     }
+
+    /**
+     * @test
+     */
+    public function it_returns_failure_on_invalid_query(): void
+    {
+        $config = SqliteConfig::fromPath($this->getDatabasePath());
+        $task = new ExecuteQuery($config, 'INVALID QUERY');
+
+        $result = $task->run($this->createMock(Channel::class), $this->createMock(Cancellation::class));
+
+        $this->assertFalse($result->isSuccess());
+    }
 }
