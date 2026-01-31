@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Tasks;
 
-use PDO;
-use Exception;
-use Tests\TestCase;
 use Amp\Cancellation;
 use Amp\Sync\Channel;
-use Phenix\Sqlite\SqliteConfig;
+use Exception;
+use PDO;
 use Phenix\Sqlite\Internal\Tasks\BeginTransaction;
 use Phenix\Sqlite\Internal\Tasks\CommitTransaction;
+use Phenix\Sqlite\SqliteConfig;
+use Tests\TestCase;
 
 class CommitTransactionTest extends TestCase
 {
@@ -42,7 +42,7 @@ class CommitTransactionTest extends TestCase
         $beginTask = new BeginTransaction($config);
         $beginTask->run($this->createMock(Channel::class), $this->createMock(Cancellation::class));
 
-        $task = new class($config) extends CommitTransaction {
+        $task = new class ($config) extends CommitTransaction {
             protected function connect(): PDO
             {
                 throw new Exception('Error committing transaction');

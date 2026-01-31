@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Tasks;
 
-use PDO;
-use Tests\TestCase;
 use Amp\Cancellation;
 use Amp\Sync\Channel;
+use PDO;
 use Phenix\Sqlite\Internal\Exceptions\SqliteException;
-use Phenix\Sqlite\SqliteConfig;
 use Phenix\Sqlite\Internal\Tasks\BeginTransaction;
+use Phenix\Sqlite\SqliteConfig;
+use Tests\TestCase;
 
 class BeginTransactionTest extends TestCase
 {
@@ -35,7 +35,7 @@ class BeginTransactionTest extends TestCase
     {
         $config = SqliteConfig::fromPath($this->getDatabasePath());
 
-        $task = new class($config) extends BeginTransaction {
+        $task = new class ($config) extends BeginTransaction {
             protected function connect(): PDO
             {
                 throw new SqliteException('Error beginning transaction');
