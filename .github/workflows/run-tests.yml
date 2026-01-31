@@ -21,21 +21,7 @@ jobs:
         with:
           php-version: 8.2
           coverage: pcov
-          extensions: |
-            mbstring
-            pdo
-            sqlite3
-            pdo_sqlite
-            intl
-            json
-            fileinfo
-            pcntl
-            dom
-            xml
-            openssl
-          ini-values: |
-            extension=pdo_sqlite
-            extension=sqlite3
+          extensions: mbstring pdo sqlite3 pdo_sqlite intl json fileinfo pcntl dom xml openssl
 
       - name: Setup problem matchers
         run: |
