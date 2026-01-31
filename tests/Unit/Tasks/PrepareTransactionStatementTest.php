@@ -7,6 +7,7 @@ namespace Tests\Unit\Tasks;
 use Amp\Cancellation;
 use Amp\Sync\Channel;
 use Phenix\Sqlite\Internal\Tasks\BeginTransaction;
+use Phenix\Sqlite\Internal\Tasks\ExecuteQuery;
 use Phenix\Sqlite\Internal\Tasks\PrepareTransactionStatement;
 use Phenix\Sqlite\SqliteConfig;
 use Tests\TestCase;
@@ -20,7 +21,7 @@ class PrepareTransactionStatementTest extends TestCase
     {
         $config = SqliteConfig::fromPath($this->getDatabasePath());
 
-        $create = new PrepareTransactionStatement($config, 'CREATE TABLE test (id INTEGER PRIMARY KEY)');
+        $create = new ExecuteQuery($config, 'CREATE TABLE test (id INTEGER PRIMARY KEY)');
         $create->run($this->createMock(Channel::class), $this->createMock(Cancellation::class));
 
         $begin = new BeginTransaction($config);
