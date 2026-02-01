@@ -10,18 +10,39 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        php: [8.2]
+        stability: [prefer-stable]
+
+    name: P${{ matrix.php }} - ${{ matrix.stability }} - ${{ matrix.os }}
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: 8.2
-          coverage: pcov
-          extensions: mbstring pdo sqlite3 pdo_sqlite intl json fileinfo pcntl dom xml openssl
+          php-version: ${{ matrix.php }}
+          coverage: xdebug
+          extensions: mbstring pdo sqlite3 pdo_sqlite intl json fileinfo pcntl dom xml openssl zip xdebug
+          tools: composer:v2
+
+      - name: Get composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ matrix.stability }}-${{ hashFiles('**/composer.json') }}
+          restore-keys: ${{ runner.os }}-composer-
 
       - name: Setup problem matchers
         run: |
@@ -29,20 +50,16 @@ jobs:
           echo "::add-matcher::${{ runner.tool_cache }}/phpunit.json"
 
       - name: Install dependencies
-        run: |
-          composer install --no-interaction --prefer-dist --no-progress --no-suggest
+        run: composer update --${{ matrix.stability }} --prefer-dist --no-interaction
 
       - name: Check code formatting with PHP CS Fixer
-        run: |
-          vendor/bin/php-cs-fixer fix --dry-run --diff --ansi
+        run: vendor/bin/php-cs-fixer fix --dry-run --diff --ansi
 
       - name: Analyze code statically with PHPStan
-        run: |
-          vendor/bin/phpstan
+        run: vendor/bin/phpstan
 
       - name: Execute tests
-        run: |
-          vendor/bin/phpunit
+        run: vendor/bin/phpunit
 
       - name: Prepare paths for SonarQube analysis
         run: |
