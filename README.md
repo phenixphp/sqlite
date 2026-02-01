@@ -5,8 +5,8 @@ Asynchronous SQLite 3 client for PHP based on [Amp](https://amphp.org/).
 [![Tests](https://github.com/phenixphp/sqlite/actions/workflows/run-tests.yml/badge.svg?branch=main)](https://github.com/phenixphp/sqlite/actions/workflows/run-tests.yml)
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/phenixphp/sqlite.svg?style=flat-square)](https://packagist.org/packages/phenixphp/sqlite)
 [![Total Downloads](https://img.shields.io/packagist/dt/phenixphp/sqlite.svg?style=flat-square)](https://packagist.org/packages/phenixphp/sqlite)
-[![PHP Version](https://img.shields.io/packagist/php/phenixphp/sqlite.svg?style=flat-square)](https://packagist.org/packages/phenixphp/sqlite)
-[![License](https://img.shields.io/packagist/license/phenixphp/sqlite.svg?style=flat-square)](https://packagist.org/packages/phenixphp/sqlite)
+[![PHP Version](https://img.shields.io/packagist/php-v/phenixphp/sqlite?style=flat-square)](https://packagist.org/packages/phenixphp/sqlite)
+[![License](https://img.shields.io/packagist/l/phenixphp/sqlite?style=flat-square)](https://packagist.org/packages/phenixphp/sqlite)
 
 ---
 
