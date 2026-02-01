@@ -12,6 +12,7 @@
     ],
     "require": {
         "php": "^8.2",
+        "ext-sqlite3": "*",
         "amphp/amp": "^3",
         "amphp/parser": "^1.1",
         "amphp/pipeline": "^1",
