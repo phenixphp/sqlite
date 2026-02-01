@@ -1,7 +1,6 @@
 {
     "name": "phenixphp/sqlite",
-    "version": "0.0.1",
-    "description": "Asynchronous SQLite client for PHP based on Amp.",
+    "description": "Asynchronous SQLite 3 client for PHP based on Amp.",
     "license": "MIT",
     "homepage": "https://github.com/phenixphp/sqlite",
     "authors": [
