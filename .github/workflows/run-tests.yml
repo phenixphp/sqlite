@@ -59,7 +59,7 @@ jobs:
         run: vendor/bin/phpstan
 
       - name: Execute tests
-        run: vendor/bin/phpunit
+        run: XDEBUG_MODE=coverage vendor/bin/phpunit
 
       - name: Prepare paths for SonarQube analysis
         run: |
