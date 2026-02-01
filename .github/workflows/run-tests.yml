@@ -59,7 +59,9 @@ jobs:
         run: vendor/bin/phpstan
 
       - name: Execute tests
-        run: XDEBUG_MODE=coverage vendor/bin/phpunit
+        run: |
+          cp phpunit.xml.dist phpunit.xml
+          vendor/bin/phpunit
 
       - name: Prepare paths for SonarQube analysis
         run: |
