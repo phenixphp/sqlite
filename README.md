@@ -1,6 +1,6 @@
 # phenixphp/sqlite
 
-<p>Asynchronous SQLite 3 client for PHP based on <a href="https://amphp.org/">Amp</a>.</p>
+Asynchronous SQLite 3 client for PHP based on [Amp](https://amphp.org/).
 
 [![Tests](https://github.com/phenixphp/sqlite/actions/workflows/run-tests.yml/badge.svg?branch=main)](https://github.com/phenixphp/sqlite/actions/workflows/run-tests.yml)
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/phenixphp/sqlite.svg?style=flat-square)](https://packagist.org/packages/phenixphp/sqlite)
@@ -24,7 +24,6 @@
   - [Executing Queries](#executing-queries)
   - [Prepared Statements](#prepared-statements)
   - [Transactions](#transactions)
-- [Dependencies](#dependencies)
 - [License](#license)
 
 ---
@@ -236,6 +235,14 @@ try {
 ```
 
 ---
+
+## Learning Phenix
+
+You can learn about Phenix in the official [documentation](https://phenix.omarbarbosa.com) and discover the power of asynchronous and concurrent applications in native PHP.
+
+## Security Vulnerabilities
+
+If you discover a security vulnerability within Phenix, please send an e-mail to Omar Barbosa via [contacto@omarbarbosa.com](mailto:contacto@omarbarbosa.com). All security vulnerabilities will be promptly addressed.
 
 ## License
 
