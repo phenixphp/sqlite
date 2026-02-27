@@ -103,10 +103,6 @@ class SqliteConnectionTransaction implements SqliteTransaction
         foreach ($this->onCommitCallbacks as $callback) {
             $callback();
         }
-
-        if ($this->savepointId === null) {
-            $this->processor->shutdown();
-        }
     }
 
     public function rollback(): void
@@ -127,10 +123,6 @@ class SqliteConnectionTransaction implements SqliteTransaction
 
         foreach ($this->onRollbackCallbacks as $callback) {
             $callback();
-        }
-
-        if ($this->savepointId === null) {
-            $this->processor->shutdown();
         }
     }
 

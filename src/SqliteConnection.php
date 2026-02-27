@@ -18,9 +18,10 @@ use Phenix\Sqlite\Contracts\SqliteStatement;
 use Phenix\Sqlite\Contracts\SqliteTransaction;
 use Phenix\Sqlite\Internal\Exceptions\SqliteException;
 use Phenix\Sqlite\Internal\SqliteConnectionStatement;
-use Phenix\Sqlite\Internal\SqliteWorkerFactory;
 use Revolt\EventLoop;
 use Throwable;
+
+use function Amp\Parallel\Worker\getWorker;
 
 class SqliteConnection implements SqliteConnectionContract
 {
@@ -108,7 +109,7 @@ class SqliteConnection implements SqliteConnectionContract
 
         $this->busy = $deferred = new DeferredFuture();
 
-        $processor = new Internal\TransactionConnectionProcessor($this->config, SqliteWorkerFactory::create());
+        $processor = new Internal\TransactionConnectionProcessor($this->config, getWorker());
 
         try {
             $result = $processor->beginTransaction()->await();
@@ -141,7 +142,7 @@ class SqliteConnection implements SqliteConnectionContract
 
         $this->busy = $deferred = new DeferredFuture();
 
-        $processor = new Internal\ConnectionProcessor($this->config, SqliteWorkerFactory::create());
+        $processor = new Internal\ConnectionProcessor($this->config, getWorker());
 
         try {
             $data = $processor->prepare($sql)->await();

@@ -237,11 +237,6 @@ class ConnectionProcessor implements SqlTransientResource
         }
     }
 
-    public function shutdown(): void
-    {
-        $this->worker->shutdown();
-    }
-
     /**
      * @param array<array{name: string, type: string, declaredType: string|null, table: string|null, length: int, flags: int, decimals: int}>|null $columnData
      * @return array<SqliteColumnDefinition>|null
