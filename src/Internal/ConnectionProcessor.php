@@ -212,11 +212,6 @@ class ConnectionProcessor implements SqlTransientResource
         return $deferred->getFuture();
     }
 
-    public function prepare(string $sql): Future
-    {
-        return $this->executePrepare(new Tasks\PrepareStatement($this->config, $sql));
-    }
-
     public function execute(string $sql, array $params = []): Future
     {
         return $this->executeQuery(new Tasks\ExecuteStatement($this->config, $sql, $params));
@@ -235,6 +230,13 @@ class ConnectionProcessor implements SqlTransientResource
         foreach ($this->closeCallbacks as $callback) {
             $callback();
         }
+    }
+
+    public function countParameters(string $sql): int
+    {
+        $count = preg_match_all('/\?|:[a-zA-Z_][a-zA-Z0-9_]*/', $sql, $matches);
+
+        return $count ?: 0;
     }
 
     /**
@@ -310,38 +312,6 @@ class ConnectionProcessor implements SqlTransientResource
 
         $deferred = new DeferredFuture();
         $deferred->complete($result);
-
-        return $deferred->getFuture();
-    }
-
-    /**
-     * @return Future<array{parameterCount: int, columnDefinitions: array<array{name: string, type: string, declaredType: string|null, table: string|null, length: int, flags: int, decimals: int}>}>
-     */
-    protected function executePrepare(Task $task): Future
-    {
-        if ($this->isClosed()) {
-            $this->throwConnectionException();
-        }
-
-        $execution = $this->worker->submit($task);
-
-        /** @var Result $taskResult */
-        $taskResult = $execution->await();
-
-        if ($taskResult->failed()) {
-            $deferred = new DeferredFuture();
-            $deferred->error(new Error($taskResult->message() ?? "Failed to prepare statement"));
-
-            return $deferred->getFuture();
-        }
-
-        $this->lastUsedAt = time();
-
-        $data = $taskResult->output();
-        $data['columnDefinitions'] = $this->buildColumnDefinitions($data['columnDefinitions'] ?? null);
-
-        $deferred = new DeferredFuture();
-        $deferred->complete($data);
 
         return $deferred->getFuture();
     }

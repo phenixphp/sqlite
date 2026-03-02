@@ -145,17 +145,11 @@ class SqliteConnection implements SqliteConnectionContract
         $processor = new Internal\ConnectionProcessor($this->config, getWorker());
 
         try {
-            $data = $processor->prepare($sql)->await();
-
-            if ($data instanceof Error) {
-                throw new SqliteException('Failed to prepare statement: ' . $data->getMessage());
-            }
-
             $statement = new SqliteConnectionStatement(
                 processor: $processor,
                 sql: $sql,
-                parameterCount: $data['parameterCount'] ?? 0,
-                columnDefinitions: $data['columnDefinitions'] ?? [],
+                parameterCount: $processor->countParameters($sql),
+                columnDefinitions: [],
             );
         } catch (Throwable $exception) {
             $this->busy = null;

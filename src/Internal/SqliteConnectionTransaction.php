@@ -46,17 +46,11 @@ class SqliteConnectionTransaction implements SqliteTransaction
             $this->throwTransactionException();
         }
 
-        $data = $this->processor->prepare($sql)->await();
-
-        if ($data instanceof Error) {
-            throw new SqliteException('Failed to prepare statement: ' . $data->getMessage());
-        }
-
         return new SqliteConnectionStatement(
             processor: $this->processor,
             sql: $sql,
-            parameterCount: $data['parameterCount'] ?? 0,
-            columnDefinitions: $data['columnDefinitions'] ?? [],
+            parameterCount: $this->processor->countParameters($sql),
+            columnDefinitions: [],
         );
     }
 

@@ -17,11 +17,6 @@ class TransactionConnectionProcessor extends ConnectionProcessor
         return $this->executeQuery(new ExecuteTransactionQuery($this->config, $query));
     }
 
-    public function prepare(string $sql): Future
-    {
-        return $this->executePrepare(new Tasks\PrepareTransactionStatement($this->config, $sql));
-    }
-
     public function execute(string $sql, array $params = []): Future
     {
         return $this->executeQuery(new Tasks\ExecuteTransactionStatement($this->config, $sql, $params));
