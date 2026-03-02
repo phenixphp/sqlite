@@ -6,11 +6,9 @@ namespace Phenix\Sqlite\Internal;
 
 use Amp\Sql\SqlTransactionIsolation;
 use Closure;
-use Error;
 use Phenix\Sqlite\Contracts\SqliteResult;
 use Phenix\Sqlite\Contracts\SqliteStatement;
 use Phenix\Sqlite\Contracts\SqliteTransaction;
-use Phenix\Sqlite\Internal\Exceptions\SqliteException;
 use Phenix\Sqlite\Internal\Exceptions\SqliteTransactionException;
 
 class SqliteConnectionTransaction implements SqliteTransaction

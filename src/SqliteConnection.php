@@ -11,7 +11,6 @@ use Amp\ForbidSerialization;
 use Amp\Sql\SqlTransactionIsolation;
 use Amp\Sql\SqlTransactionIsolationLevel;
 use Closure;
-use Error;
 use Phenix\Sqlite\Contracts\SqliteConnection as SqliteConnectionContract;
 use Phenix\Sqlite\Contracts\SqliteResult;
 use Phenix\Sqlite\Contracts\SqliteStatement;
