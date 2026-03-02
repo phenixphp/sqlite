@@ -128,13 +128,6 @@ class ConnectDatabase implements Task
         };
     }
 
-    protected function countParameters(string $sql): int
-    {
-        $count = preg_match_all('/\?|:[a-zA-Z_][a-zA-Z0-9_]*/', $sql, $matches);
-
-        return $count ?: 0;
-    }
-
     protected function query(PDO $pdo, string $sql): Result
     {
         $stmt = $pdo->query($sql);
@@ -161,23 +154,6 @@ class ConnectDatabase implements Task
             'columnDefinitions' => null,
             'lastInsertId' => $lastInsertId !== '0' ? (int) $lastInsertId : null,
             'affectedRows' => $affectedRows,
-        ]);
-    }
-
-    protected function prepare(PDO $pdo, string $sql): Result
-    {
-        $stmt = $pdo->prepare($sql);
-
-        if (! $stmt) {
-            return Result::failure(message: "Failed to prepare statement: {$sql}");
-        }
-
-        $parameterCount = $this->countParameters($sql);
-        $columnDefinitions = $this->buildColumnDefinitions($stmt);
-
-        return Result::success([
-            'parameterCount' => $parameterCount,
-            'columnDefinitions' => $columnDefinitions,
         ]);
     }
 

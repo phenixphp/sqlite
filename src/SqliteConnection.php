@@ -11,16 +11,16 @@ use Amp\ForbidSerialization;
 use Amp\Sql\SqlTransactionIsolation;
 use Amp\Sql\SqlTransactionIsolationLevel;
 use Closure;
-use Error;
 use Phenix\Sqlite\Contracts\SqliteConnection as SqliteConnectionContract;
 use Phenix\Sqlite\Contracts\SqliteResult;
 use Phenix\Sqlite\Contracts\SqliteStatement;
 use Phenix\Sqlite\Contracts\SqliteTransaction;
 use Phenix\Sqlite\Internal\Exceptions\SqliteException;
 use Phenix\Sqlite\Internal\SqliteConnectionStatement;
-use Phenix\Sqlite\Internal\SqliteWorkerFactory;
 use Revolt\EventLoop;
 use Throwable;
+
+use function Amp\Parallel\Worker\getWorker;
 
 class SqliteConnection implements SqliteConnectionContract
 {
@@ -108,7 +108,7 @@ class SqliteConnection implements SqliteConnectionContract
 
         $this->busy = $deferred = new DeferredFuture();
 
-        $processor = new Internal\TransactionConnectionProcessor($this->config, SqliteWorkerFactory::create());
+        $processor = new Internal\TransactionConnectionProcessor($this->config, getWorker());
 
         try {
             $result = $processor->beginTransaction()->await();
@@ -141,20 +141,14 @@ class SqliteConnection implements SqliteConnectionContract
 
         $this->busy = $deferred = new DeferredFuture();
 
-        $processor = new Internal\ConnectionProcessor($this->config, SqliteWorkerFactory::create());
+        $processor = new Internal\ConnectionProcessor($this->config, getWorker());
 
         try {
-            $data = $processor->prepare($sql)->await();
-
-            if ($data instanceof Error) {
-                throw new SqliteException('Failed to prepare statement: ' . $data->getMessage());
-            }
-
             $statement = new SqliteConnectionStatement(
                 processor: $processor,
                 sql: $sql,
-                parameterCount: $data['parameterCount'] ?? 0,
-                columnDefinitions: $data['columnDefinitions'] ?? [],
+                parameterCount: $processor->countParameters($sql),
+                columnDefinitions: [],
             );
         } catch (Throwable $exception) {
             $this->busy = null;

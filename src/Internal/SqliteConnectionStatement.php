@@ -52,16 +52,10 @@ class SqliteConnectionStatement implements SqliteStatement
         $result = $execution->await();
 
         if ($result instanceof Error) {
-            $this->processor->shutdown();
-
             throw new SqliteException('Failed to execute statement: ' . $result->getMessage(), 0, $result);
         }
 
         $this->lastUsedAt = time();
-
-        if ($this->processor::class === ConnectionProcessor::class) {
-            $this->processor->shutdown();
-        }
 
         return $result;
     }
@@ -113,8 +107,6 @@ class SqliteConnectionStatement implements SqliteStatement
     {
         $this->closed = true;
         $this->bindings = [];
-
-        $this->processor->shutdown();
     }
 
     public function onClose(Closure $onClose): void
